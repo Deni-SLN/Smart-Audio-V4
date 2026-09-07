@@ -182,7 +182,7 @@
     </ul>
     <div class="px-3 mt-auto space-y-2">
         <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-gray-50 rounded-lg transition-all text-sm" onclick="logout()"><span class="material-symbols-outlined text-[20px]">logout</span>Logout</a>
-        <p class="text-center text-[10px] text-on-surface-variant opacity-50">© 2026 by deni s · v3.5</p>
+        <p class="text-center text-[10px] text-on-surface-variant opacity-50">© 2026 by deni s · v3.6</p>
     </div>
 </nav>
 
@@ -309,73 +309,194 @@
 
         <!-- BROADCAST -->
         <div class="page" id="page-broadcast">
-            <div class="flex justify-between items-end mb-5 flex-wrap gap-3">
-                <div><h2 class="text-2xl md:text-3xl font-bold flex items-center gap-2"><span class="material-symbols-outlined">cast</span>Broadcast Control</h2><p class="text-sm md:text-base text-on-surface-variant mt-1">Kontrol pemutaran media di banyak PC Host secara serentak & realtime.</p></div>
-                <button class="px-4 py-2 text-xs font-bold text-white rounded-lg shadow-sm" style="background:#50C878" onclick="openHostScreen()">📟 Buka Mode Host di PC Ini</button>
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 border-b border-slate-200 pb-5 mb-6">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="p-1.5 rounded-md bg-slate-100 text-slate-700">
+                            <span class="material-symbols-outlined text-[20px]">cast</span>
+                        </span>
+                        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Broadcast Control</h2>
+                    </div>
+                    <p class="mt-1 text-sm text-slate-500">Kontrol pemutaran media di banyak PC Host secara serentak & realtime.</p>
+                </div>
+                <div class="flex items-center gap-2 self-start md:self-auto">
+                    <span class="text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-1.5"><span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>Sinkronisasi Otomatis (1 host langsung, &gt;1 host +2 dtk)</span>
+                    <button class="px-4 py-2 text-xs font-bold text-white rounded-lg shadow-sm bg-emerald-600 hover:bg-emerald-700" onclick="openHostScreen()">📟 Buka Mode Host di PC Ini</button>
+                </div>
             </div>
             <div id="bcNoSupabase" class="glass-card rounded-xl p-6 mb-5 hidden">
                 <p class="text-sm font-bold">⚠️ Supabase belum dikonfigurasi</p>
                 <p class="text-xs text-on-surface-variant mt-1">Fitur Broadcast membutuhkan Supabase (tabel <code>broadcast_hosts</code>, <code>broadcast_commands</code>, <code>broadcast_sessions</code>). Jalankan <b>sql/schema.sql</b> di Supabase SQL Editor lalu isi <code>.env</code>.</p>
             </div>
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-2 glass-card rounded-xl p-0 overflow-hidden shadow-sm">
-                    <div class="p-5 pb-3 flex justify-between items-center flex-wrap gap-2 border-b border-outline-variant">
-                        <h3 class="text-base font-bold flex items-center gap-2"><span class="material-symbols-outlined text-[20px]">devices</span>Daftar Host<span id="bcHostCount" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-100">0</span></h3>
-                        <div class="flex gap-2">
-                            <button class="tab-btn" onclick="bcSelectMode('all')">Pilih Semua</button>
-                            <button class="tab-btn" onclick="bcSelectMode('none')">Kosongkan</button>
-                        </div>
-                    </div>
-                    <div class="px-5 py-3 border-b border-outline-variant flex gap-2 flex-wrap items-center bg-surface-variant">
-                        <input id="bcPairCode" maxlength="6" inputmode="numeric" autocomplete="off" placeholder="Kode 6 digit dari Mode Host" class="flex-1 min-w-[190px] px-3 py-2 text-sm border border-outline-variant rounded-lg tracking-[0.35em] uppercase">
-                        <button class="px-4 py-2 text-xs font-bold text-white rounded-lg shrink-0" style="background:#50C878" onclick="bcClaimHost()">➕ Tambah Host</button>
-                    </div>
-                    <div class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3" id="bcHostGrid"></div>
-                </div>
-                <div class="glass-card rounded-xl p-5 h-fit shadow-sm">
-                    <h3 class="text-base font-bold flex items-center gap-2 mb-4"><span class="material-symbols-outlined text-[20px]">settings_remote</span>Media Control</h3>
-                    <input id="bcMediaUrl" placeholder="https://youtube.com/watch?v=…" class="w-full px-3 py-2 text-xs border border-outline-variant rounded-lg mb-2">
-                    <button class="w-full py-2 text-xs font-bold text-white rounded-lg mb-3" style="background:#000" onclick="bcLoadMedia()">⏬ Muat Media ke Host Terpilih</button>
-                    <div class="grid grid-cols-3 gap-2 mb-4">
-                        <button class="py-2.5 rounded-lg text-white text-xs font-bold" style="background:#50C878" onclick="bcSendCommand('play')">▶ Play</button>
-                        <button class="py-2.5 rounded-lg text-white text-xs font-bold" style="background:#f59e0b" onclick="bcSendCommand('pause')">⏸ Pause</button>
-                        <button class="py-2.5 rounded-lg text-white text-xs font-bold" style="background:#ef4444" onclick="bcSendCommand('stop')">⏹ Stop</button>
-                    </div>
-                    <div class="mb-4">
-                        <div class="flex justify-between text-xs font-bold mb-1.5"><span>Volume</span><span id="bcVolLabel">70%</span></div>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <!-- ================= COLUMN 1: MEDIA CONTROL ================= -->
+                <section class="lg:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col space-y-5 h-fit">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3.5">
                         <div class="flex items-center gap-2">
-                            <input type="range" id="bcVolSlider" min="0" max="100" value="70" style="flex:1;accent-color:#50C878" oninput="document.getElementById('bcVolLabel').textContent=this.value+'%'" onchange="bcVolumeChange()">
-                            <button class="text-[11px] font-bold px-2.5 py-1.5 rounded border border-outline-variant shrink-0" onclick="bcSendCommand('mute')">🔇 Mute</button>
+                            <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-[18px]">settings_remote</span>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900 leading-tight">Media Control</h3>
+                                <span class="text-xs text-slate-500">Input tautan langsung & aksi cepat</span>
+                            </div>
+                        </div>
+                        <span class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-600">Quick URL</span>
+                    </div>
+                    <div class="space-y-3">
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider" for="bcMediaUrl">Tautan Media Langsung</label>
+                        <input id="bcMediaUrl" type="url" placeholder="Link YouTube / Google Drive — https://..." class="w-full text-xs sm:text-sm px-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50/60 placeholder:text-slate-400">
+                        <button class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold shadow transition-all" onclick="bcLoadMedia()">⏬ <span>Muat ke Host Terpilih</span></button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 pt-1">
+                        <button class="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm shadow-sm transition" onclick="bcSendCommand('play')">▶ <span>Play</span></button>
+                        <button class="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs sm:text-sm shadow-sm transition" onclick="bcSendCommand('pause')">⏸ <span>Pause</span></button>
+                        <button class="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs sm:text-sm shadow-sm transition" onclick="bcSendCommand('stop')">⏹ <span>Stop</span></button>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200/70 p-3.5 rounded-xl space-y-2">
+                        <div class="flex items-center justify-between text-xs font-semibold text-slate-700">
+                            <span>🔊 Volume Broadcast</span>
+                            <span class="text-emerald-600 font-bold" id="bcVolLabel">70%</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="range" id="bcVolSlider" min="0" max="100" value="70" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" oninput="document.getElementById('bcVolLabel').textContent=this.value+'%'" onchange="bcVolumeChange()">
+                            <button class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition" onclick="bcSendCommand('mute')">🔇 Mute</button>
                         </div>
                     </div>
-                    <button class="w-full py-2.5 text-xs font-bold rounded-lg border border-outline-variant mb-3" onclick="bcSendCommand('fullscreen')">⛶ Fullscreen</button>
-                    <p class="text-[10px] text-on-surface-variant leading-relaxed border-t border-outline-variant pt-2.5">Play dieksekusi serentak oleh semua host berdasarkan timestamp server (+2 detik toleransi). Titik hijau = Online dalam 45 detik terakhir. Update status realtime tanpa refresh.</p>
-                </div>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <button class="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-medium transition" onclick="bcSendCommand('fullscreen')">⛶ <span>Fullscreen</span></button>
+                        <button class="inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-medium transition" onclick="bcSendCommand('exitfs')">🗗 <span>Minimize</span></button>
+                    </div>
+                    <div class="space-y-1.5">
+                        <button id="bcAdzanBtn" class="w-full py-2 px-3 rounded-lg border border-slate-300 text-xs font-bold transition" onclick="toggleBcAdzan()">🔔 Jeda Adzan: OFF</button>
+                        <p class="text-[11px] leading-relaxed text-slate-400">Saat <b>Jeda Adzan ON</b>: adzan tidak bunyi & musik/video tidak dihentikan 5 menit sebelum adzan.</p>
+                    </div>
+                    <div class="pt-2 border-t border-slate-100">
+                        <p class="text-[11px] leading-relaxed text-slate-400">1 host: putar langsung tanpa delay. &gt;1 host: eksekusi serentak via timestamp server (+2 detik toleransi). Titik hijau = Online dalam 45 detik terakhir.</p>
+                    </div>
+                </section>
+                <!-- ================= COLUMN 2: DAFTAR HOST ================= -->
+                <section class="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col space-y-4 h-fit">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3.5">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-[18px]">devices</span>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-1.5">
+                                    <h3 class="text-base font-bold text-slate-900 leading-tight">Daftar Host</h3>
+                                    <span id="bcHostCount" class="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">0</span>
+                                </div>
+                                <span class="text-xs text-slate-500">Perangkat penerima</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1 text-xs font-medium">
+                            <button class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition" onclick="bcSelectMode('all')">Semua</button>
+                            <button class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition" onclick="bcSelectMode('none')">Batal</button>
+                        </div>
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider" for="bcPairCode">Tambah Host Baru</label>
+                        <div class="flex gap-2">
+                            <input id="bcPairCode" maxlength="6" inputmode="numeric" autocomplete="off" placeholder="Kode 6 digit host" class="flex-1 min-w-0 text-xs font-mono uppercase tracking-[0.3em] px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50/60 placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-400">
+                            <button class="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition shrink-0" onclick="bcClaimHost()">➕ <span>Host</span></button>
+                        </div>
+                    </div>
+                    <div id="bcHostGrid" class="space-y-2.5 pt-1 max-h-[420px] overflow-y-auto pr-0.5"></div>
+                    <div class="text-xs text-slate-400 text-center pt-1">Centang PC Host yang ingin menerima siaran serentak.</div>
+                </section>
+                <!-- ================= COLUMN 3: MULTIMEDIA & PLAYLIST ================= -->
+                <section class="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col space-y-5 h-fit">
+                    <div class="flex items-start justify-between border-b border-slate-100 pb-3.5 gap-2">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <div class="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center shrink-0">
+                                <span class="material-symbols-outlined text-[20px]">playlist_play</span>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-base sm:text-lg font-bold text-slate-900 leading-tight">Multimedia & Playlist</h3>
+                                    <span id="bcPlCount" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-50 text-violet-700 border border-violet-200 shrink-0">0 Item</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-0.5">Kelola antrean lagu / video dari URL atau file offline</p>
+                                <p class="text-[11px] text-slate-400 mt-0.5 truncate" id="bcQNow">Playlist kosong</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-3 rounded-xl border border-slate-200 p-3.5 bg-white">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <span class="text-xs font-bold text-slate-800 uppercase tracking-wide">Tambah Media ke Playlist</span>
+                            <span class="text-[11px] text-slate-400">Pilih sumber</span>
+                        </div>
+                        <div class="grid grid-cols-2 p-1 bg-slate-100 rounded-lg text-xs font-semibold">
+                            <button id="tab-url-btn" class="py-1.5 rounded-md bg-white text-slate-800 shadow-xs text-center transition" onclick="bcMediaTab('url')">🔗 Tautan (URL)</button>
+                            <button id="tab-file-btn" class="py-1.5 rounded-md text-slate-500 hover:text-slate-800 text-center transition" onclick="bcMediaTab('file')">📁 File Offline</button>
+                        </div>
+                        <div class="space-y-2.5" id="panel-url">
+                            <div class="flex gap-2">
+                                <input id="bcQUrl" placeholder="Tempel URL YouTube / Drive / Audio Stream..." class="flex-1 min-w-0 text-xs px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 placeholder:text-slate-400">
+                                <select id="bcQKind" class="px-1.5 py-2 text-xs border border-slate-300 rounded-lg shrink-0 bg-white" title="Jenis media"><option value="auto">Otomatis</option><option value="video">Video</option><option value="audio">Musik</option></select>
+                                <button class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1 shrink-0 transition" onclick="bcPlAddUrl()">+ <span>Tambah</span></button>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Mendukung link YouTube, Google Drive publik, direct .mp3/.mp4 stream.</p>
+                        </div>
+                        <div class="hidden space-y-2.5" id="panel-file">
+                            <div class="flex gap-2">
+                                <select id="bcQTrack" class="flex-1 min-w-0 text-xs px-2 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"><option value="">— dari library (URL & offline) —</option></select>
+                                <button class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shrink-0 transition" onclick="bcPlAddLibrary()">+ Tambah</button>
+                            </div>
+                            <button class="w-full flex flex-col items-center justify-center gap-1 py-3 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition" onclick="document.getElementById('bcPlFile').click()">
+                                <span class="text-xs text-slate-600 font-medium"><span class="font-semibold text-emerald-600">Klik untuk upload file offline</span> (MP3/WAV/MP4/WebM)</span>
+                                <span class="text-[10px] text-slate-400">Tersimpan di PC ini & masuk playlist aktif</span>
+                            </button>
+                            <input type="file" id="bcPlFile" accept="audio/*,video/*" multiple style="display:none" onchange="bcPlAddFiles(this)">
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Daftar Item Playlist</span>
+                            <span class="text-[11px] text-slate-400">Tekan tombol Play untuk memutar per item</span>
+                        </div>
+                        <div id="bcQueueList" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
+                    </div>
+                    <div class="pt-2 border-t border-slate-100 space-y-2">
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <button class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm shadow-sm transition" onclick="bcPlPlayAll()">▶ <span>Muat & Putar</span></button>
+                            <button class="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm transition" onclick="bcQueueNext()">⏭ <span>Berikutnya</span></button>
+                        </div>
+                        <div class="text-center pt-1">
+                            <button class="text-xs text-rose-600 hover:text-rose-700 hover:underline font-semibold inline-flex items-center gap-1 transition" onclick="bcPlClear()">🗑️ <span>Bersihkan isi playlist</span></button>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
 
         <!-- LIBRARY -->
         <div class="page" id="page-library">
-            <h2 class="text-lg font-bold mb-3">Library Musik</h2>
-            <div class="flex gap-2 mb-3">
+            <h2 class="text-lg font-bold mb-3">Library Musik & Video</h2>
+            <div class="flex gap-2 mb-3 flex-wrap">
                 <button class="tab-btn active" onclick="switchLibTab('offline',this)">Offline (File Lokal)</button>
                 <button class="tab-btn" onclick="switchLibTab('online',this)">Online (Supabase)</button>
+                <span class="flex-1"></span>
+                <button class="tab-btn active" id="libFilterMusik" onclick="switchLibMedia('audio',this)">🎵 Daftar Musik</button>
+                <button class="tab-btn" id="libFilterVideo" onclick="switchLibMedia('video',this)">🎬 Daftar Video</button>
             </div>
             <div id="libTabOffline">
                 <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
                     <span class="material-symbols-outlined text-3xl text-on-surface-variant">computer</span>
-                    <p class="text-sm text-on-surface-variant mt-1">Drag & drop atau klik upload musik</p>
-                    <p class="text-[11px] text-on-surface-variant">MP3, WAV, OGG &bull; Tersimpan offline</p>
+                    <p class="text-sm text-on-surface-variant mt-1">Drag & drop atau klik upload musik / video</p>
+                    <p class="text-[11px] text-on-surface-variant">MP3, WAV, OGG, MP4, WebM &bull; Tersimpan offline</p>
                 </div>
-                <input type="file" id="fileInput" accept="audio/*" multiple style="display:none">
+                <input type="file" id="fileInput" accept="audio/*,video/*" multiple style="display:none">
             </div>
             <div id="libTabOnline" style="display:none">
                 <div class="glass-card rounded-xl p-4">
                     <div class="flex gap-2 flex-wrap">
                         <button class="px-3 py-2 text-sm font-bold text-white rounded-lg" style="background:#50C878" onclick="document.getElementById('supabaseFileInput').click()"><span class="material-symbols-outlined text-sm align-middle">cloud_upload</span> Upload ke Supabase</button>
                         <input type="file" id="supabaseFileInput" accept="audio/*" style="display:none" onchange="uploadToSupabase(this)">
-                        <input type="text" class="flex-1 min-w-[200px] px-3 py-2 text-sm border border-outline-variant rounded-lg" id="onlineUrlInput" placeholder="Atau paste URL audio">
-                        <input type="text" class="w-36 px-3 py-2 text-sm border border-outline-variant rounded-lg" id="onlineNameInput" placeholder="Nama lagu">
+                        <input type="text" class="flex-1 min-w-[200px] px-3 py-2 text-sm border border-outline-variant rounded-lg" id="onlineUrlInput" placeholder="Atau paste URL audio / video (MP4, YouTube)">
+                        <select id="onlineKindInput" class="px-2 py-2 text-sm border border-outline-variant rounded-lg" title="Jenis media"><option value="audio">Musik</option><option value="video">Video</option><option value="auto">Otomatis</option></select>
+                        <input type="text" class="w-36 px-3 py-2 text-sm border border-outline-variant rounded-lg" id="onlineNameInput" placeholder="Nama lagu/video">
                         <button class="px-3 py-2 text-sm font-bold text-white rounded-lg" style="background:#50C878" onclick="addOnlineTrack()">Tambah</button>
                     </div>
                     <p class="text-[11px] text-on-surface-variant mt-2" id="supabaseStatus"></p>
@@ -383,8 +504,9 @@
                 <div class="glass-card rounded-xl p-4 mt-3">
                     <div class="flex items-center gap-1.5 mb-2"><span class="material-symbols-outlined text-[16px]" style="color:#4285F4">file_copy</span><span class="text-xs font-bold text-on-surface-variant">Google Drive (berbagi untuk semua user)</span></div>
                     <div class="flex gap-2 flex-wrap">
-                        <input type="text" class="flex-1 min-w-[180px] px-3 py-2 text-sm border border-outline-variant rounded-lg" id="gdriveNameInput" placeholder="Judul lagu">
+                        <input type="text" class="flex-1 min-w-[180px] px-3 py-2 text-sm border border-outline-variant rounded-lg" id="gdriveNameInput" placeholder="Judul lagu / video">
                         <input type="text" class="flex-1 min-w-[220px] px-3 py-2 text-sm border border-outline-variant rounded-lg" id="gdriveLinkInput" placeholder="Link share Google Drive">
+                        <select id="gdriveKindInput" class="px-2 py-2 text-sm border border-outline-variant rounded-lg" title="Jenis media"><option value="audio">Musik</option><option value="video">Video</option></select>
                         <button class="px-3 py-2 text-sm font-bold text-white rounded-lg" style="background:#4285F4" onclick="addGDriveTrack()">Tambah</button>
                     </div>
                     <p class="text-[11px] text-on-surface-variant mt-1.5">Tempel link berbagi (siapa pun dengan link), file audio tidak memakai kuota Supabase.</p>
@@ -392,7 +514,7 @@
                 </div>
             </div>
             <div class="glass-card rounded-xl p-5 mt-3">
-                <div class="flex justify-between items-center mb-3 gap-2 flex-wrap"><h3 class="text-sm font-bold">Daftar Lagu (<span id="trackCount">0</span>) <span class="ml-1 align-middle whitespace-nowrap"><span class="type-icon type-offline align-middle"><span class="material-symbols-outlined" style="font-size:12px">computer</span></span> <span class="text-[10px] text-on-surface-variant font-normal align-middle">Lokal</span> <span class="type-icon type-online align-middle ml-1"><span class="material-symbols-outlined" style="font-size:12px">cloud</span></span> <span class="text-[10px] text-on-surface-variant font-normal align-middle">Online</span></span></h3><button class="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-outline-variant hover:bg-gray-50" onclick="playAllTracks()">Putar Semua</button></div>
+                <div class="flex justify-between items-center mb-3 gap-2 flex-wrap"><h3 class="text-sm font-bold"><span id="trackListTitle">Daftar Lagu</span> (<span id="trackCount">0</span>) <span class="ml-1 align-middle whitespace-nowrap"><span class="type-icon type-offline align-middle"><span class="material-symbols-outlined" style="font-size:12px">computer</span></span> <span class="text-[10px] text-on-surface-variant font-normal align-middle">Lokal</span> <span class="type-icon type-online align-middle ml-1"><span class="material-symbols-outlined" style="font-size:12px">cloud</span></span> <span class="text-[10px] text-on-surface-variant font-normal align-middle">Online</span></span></h3><button class="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-outline-variant hover:bg-gray-50" onclick="playAllTracks()">Putar Semua</button></div>
                 <div id="trackList" class="space-y-1.5"></div>
             </div>
         </div>
@@ -527,6 +649,12 @@
     <p class="text-[11px] text-on-surface-variant mb-2">Pilih lagu dari library:</p>
     <div id="upacaraSongPicker" class="mt-1.5 space-y-1 max-h-64 overflow-y-auto mb-3"></div>
     <button class="w-full py-2 text-sm font-bold text-white rounded-lg" style="background:#50C878" onclick="addSongsToUpacara()">Tambah Lagu</button>
+</div></div>
+
+<div class="modal-overlay" id="videoPlayerModal"><div class="modal" style="max-width:720px">
+    <div class="flex justify-between items-center mb-3"><h3 class="text-sm font-bold truncate" id="videoPlayerTitle">Video</h3><button class="text-lg" onclick="closeVideoModal()">&times;</button></div>
+    <video id="videoPlayerEl" controls playsinline preload="metadata" style="width:100%;max-height:60vh;background:#000;border-radius:8px"></video>
+    <p class="text-[11px] text-on-surface-variant mt-2">Sumber video dari Library (file lokal / URL / Google Drive).</p>
 </div></div>
 
 <div class="modal-overlay" id="scheduleModal"><div class="modal">

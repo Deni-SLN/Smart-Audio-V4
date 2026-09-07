@@ -64,6 +64,18 @@ CREATE TABLE IF NOT EXISTS upacaras (
 );
 
 -- ============================================
+-- TABEL EVENTS (mirip upacaras, tapi isi campur audio + video dari library)
+-- ============================================
+CREATE TABLE IF NOT EXISTS events (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    track_ids TEXT[] DEFAULT '{}',
+    play_once BOOLEAN DEFAULT TRUE,
+    owner TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================
 -- TABEL SCHEDULES
 -- ============================================
 CREATE TABLE IF NOT EXISTS schedules (
@@ -88,6 +100,7 @@ CREATE TABLE IF NOT EXISTS schedules (
 CREATE INDEX IF NOT EXISTS idx_tracks_owner ON tracks(owner);
 CREATE INDEX IF NOT EXISTS idx_playlists_owner ON playlists(owner);
 CREATE INDEX IF NOT EXISTS idx_upacaras_owner ON upacaras(owner);
+CREATE INDEX IF NOT EXISTS idx_events_owner ON events(owner);
 CREATE INDEX IF NOT EXISTS idx_schedules_owner ON schedules(owner);
 
 -- ============================================
@@ -96,17 +109,20 @@ CREATE INDEX IF NOT EXISTS idx_schedules_owner ON schedules(owner);
 ALTER TABLE tracks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE playlists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE upacaras ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "tracks_all" ON tracks;
 DROP POLICY IF EXISTS "playlists_all" ON playlists;
 DROP POLICY IF EXISTS "upacaras_all" ON upacaras;
+DROP POLICY IF EXISTS "events_all" ON events;
 DROP POLICY IF EXISTS "schedules_all" ON schedules;
 DROP POLICY IF EXISTS "users_all" ON users;
 CREATE POLICY "tracks_all" ON tracks FOR ALL USING (true);
 CREATE POLICY "playlists_all" ON playlists FOR ALL USING (true);
 CREATE POLICY "upacaras_all" ON upacaras FOR ALL USING (true);
+CREATE POLICY "events_all" ON events FOR ALL USING (true);
 CREATE POLICY "schedules_all" ON schedules FOR ALL USING (true);
 CREATE POLICY "users_all" ON users FOR ALL USING (true);
 
@@ -118,6 +134,8 @@ CREATE POLICY "users_all" ON users FOR ALL USING (true);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS settings JSONB DEFAULT '{}';
 -- Volume per-jadwal musik
 ALTER TABLE schedules ADD COLUMN IF NOT EXISTS volume INT DEFAULT 100;
+-- Jenis media library: 'audio' (lama) atau 'video' (baru, untuk menu Event)
+ALTER TABLE tracks ADD COLUMN IF NOT EXISTS media_kind TEXT DEFAULT 'audio';
 -- ALTER TABLE tracks ALTER COLUMN id TYPE TEXT;
 -- ALTER TABLE tracks ALTER COLUMN src SET DEFAULT '';
 -- ALTER TABLE tracks ADD COLUMN IF NOT EXISTS volume INT DEFAULT 100;
@@ -152,6 +170,8 @@ CREATE TABLE IF NOT EXISTS broadcast_commands (
     volume INT,
     seek_to FLOAT,
     start_at TIMESTAMPTZ,
+    queue JSONB,
+    queue_index INT DEFAULT 0,
     created_by TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
