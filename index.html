@@ -8,6 +8,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <title>Musik Pintar</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link rel="stylesheet" href="/src/index.css">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
@@ -15,6 +16,231 @@
     </script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#fff;color:#0f172a}
+
+        /* ===== LOGIN PAGE STYLES (Pixel-perfect matching design) ===== */
+        #loginPage {
+            position: fixed;
+            inset: 0;
+            z-index: 60;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            background-color: #f8fafc;
+            background-image: 
+                linear-gradient(to right, rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+            background-size: 28px 28px;
+            background-position: center center;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+        .dark #loginPage {
+            background-color: #0b1120;
+            background-image: 
+                linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+        }
+        .login-app-icon-sm {
+            width: 32px !important;
+            height: 32px !important;
+            border-radius: 10px !important;
+            background: linear-gradient(135deg, #10b981 0%, #2dd4bf 100%) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.25) !important;
+            flex-shrink: 0 !important;
+        }
+        .login-app-icon-lg {
+            width: 56px !important;
+            height: 56px !important;
+            border-radius: 18px !important;
+            background: linear-gradient(135deg, #10b981 0%, #2dd4bf 100%) !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.35) !important;
+            margin-bottom: 16px !important;
+        }
+        .login-brand-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            border-radius: 16px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+        }
+        .login-card-container {
+            width: 100%;
+            max-width: 420px;
+            background: #ffffff;
+            border-radius: 28px;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            box-shadow: 0 20px 45px -12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.04);
+            padding: 40px 32px;
+            margin: auto;
+        }
+        @media (min-width: 640px) {
+            .login-card-container {
+                padding: 44px 36px;
+            }
+        }
+        .dark .login-card-container {
+            background: #1e293b;
+            border-color: #334155;
+            box-shadow: 0 20px 45px -12px rgba(0, 0, 0, 0.4);
+        }
+        .login-field-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
+        }
+        .dark .login-field-label {
+            color: #94a3b8;
+        }
+        .login-input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+        .login-input-wrap .input-icon-left {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            pointer-events: none;
+            width: 20px;
+            height: 20px;
+            z-index: 2;
+        }
+        .login-input-wrap .input-btn-right {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            cursor: pointer;
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: transparent;
+            padding: 0;
+            border-radius: 6px;
+            z-index: 2;
+            transition: color 0.15s ease;
+        }
+        .login-input-wrap .input-btn-right:hover {
+            color: #475569;
+        }
+        .login-input-wrap input {
+            width: 100% !important;
+            height: 48px !important;
+            box-sizing: border-box !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            padding-left: 44px !important;
+            padding-right: 16px !important;
+            font-size: 14px !important;
+            line-height: 48px !important;
+            background-color: #f8fafc !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 12px !important;
+            color: #0f172a !important;
+            outline: none !important;
+            transition: all 0.15s ease-in-out !important;
+        }
+        .dark .login-input-wrap input {
+            background-color: #0f172a !important;
+            border-color: #334155 !important;
+            color: #f8fafc !important;
+        }
+        .login-input-wrap input.has-toggle {
+            padding-right: 44px !important;
+        }
+        .login-input-wrap input:focus {
+            background-color: #ffffff !important;
+            border-color: #10b981 !important;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15) !important;
+        }
+        .dark .login-input-wrap input:focus {
+            background-color: #0f172a !important;
+            border-color: #10b981 !important;
+        }
+        .login-input-wrap input::placeholder {
+            color: #94a3b8 !important;
+            font-size: 14px !important;
+        }
+        .login-btn-primary {
+            width: 100%;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 6px 18px -3px rgba(16, 185, 129, 0.35);
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+        }
+        .login-btn-primary:hover {
+            filter: brightness(1.05);
+            box-shadow: 0 8px 22px -3px rgba(16, 185, 129, 0.45);
+        }
+        .login-btn-primary:active {
+            transform: scale(0.99);
+        }
+        .login-btn-secondary {
+            width: 100%;
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            color: #334155;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .dark .login-btn-secondary {
+            background: #0f172a;
+            border-color: #334155;
+            color: #cbd5e1;
+        }
+        .login-btn-secondary:hover {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+            color: #0f172a;
+        }
+        .dark .login-btn-secondary:hover {
+            background: #1e293b;
+            color: #ffffff;
+        }
+        .login-btn-secondary:active {
+            transform: scale(0.99);
+        }
         .glass-card{background:#fff;border:1px solid #e2e8f0}
         .mosque-pattern{background-image:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5c1.1 0 2 .9 2 2v3h4v4h4v4h4v4h4v4h4v4h4v4h4v4h4v4h4v5H0v-5h4v-4h4v-4h4v-4h4v-4h4v-4h4v-4h4v-4h4V10h4V7c0-1.1.9-2 2-2zm-2 7H4v28h52V12H32v18h-4V12z' fill='%23000000' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");background-size:80px}
         .nav-active{background:#f1f5f9!important;color:#000!important;font-weight:700;border-left:4px solid #000}
@@ -199,24 +425,191 @@
         </div>
     </header>
 
-    <div class="flex-1 overflow-y-auto p-5 md:p-6 space-y-6 max-w-6xl mx-auto w-full">
+    <div class="flex-1 overflow-y-auto p-5 md:p-6 space-y-6 max-w-6xl mx-auto w-full pb-28">
 
         <!-- LOGIN -->
-        <div id="loginPage">
-            <div class="flex items-center justify-center min-h-[60vh]">
-                <div class="glass-card rounded-2xl p-8 w-full max-w-sm">
-                    <div class="text-center mb-6">
-                        <div class="w-14 h-14 rounded-full mx-auto mb-3 flex items-center justify-center text-white" style="background:#50C878"><span class="material-symbols-outlined text-2xl">person</span></div>
-                        <h2 class="text-lg font-bold">Login</h2>
+        <div id="loginPage" class="fixed inset-0 z-[60] flex flex-col overflow-y-auto">
+            <!-- Top Header -->
+            <header class="p-6 sm:p-8 flex items-center justify-between z-10 flex-shrink-0">
+                <div class="login-brand-badge">
+                    <div class="login-app-icon-sm" style="width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#10b981 0%,#2dd4bf 100%);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(16,185,129,0.25);flex-shrink:0;">
+                        <svg style="width:18px;height:18px;color:#ffffff;" fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M3 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"></path>
+                            <path d="M13 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"></path>
+                            <path d="M9 17v-13h10v13"></path>
+                            <path d="M9 8h10"></path>
+                        </svg>
                     </div>
-                    <div class="space-y-3">
-                        <input type="text" class="w-full px-4 py-2.5 text-sm border border-outline-variant rounded-lg" id="loginEmail" placeholder="Email atau Username">
-                        <input type="password" class="w-full px-4 py-2.5 text-sm border border-outline-variant rounded-lg" id="loginPassword" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
-                        <button class="w-full py-2.5 text-sm font-bold text-white rounded-lg" style="background:#50C878" onclick="doLogin()">Masuk</button>
-                        <button class="w-full py-2 text-[11px] font-bold rounded-lg border border-outline-variant text-on-surface-variant hover:bg-gray-50" onclick="openHostScreen()">📡 Mode Host — untuk PC/layar penerima Broadcast</button>
+                    <span class="text-sm font-bold text-slate-900 tracking-tight">Smart Audio</span>
+                    <span class="px-2 py-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 rounded border border-emerald-200">LIVE</span>
+                </div>
+                <div class="text-xs text-slate-400"></div>
+            </header>
+
+            <!-- Centered Login Card -->
+            <main class="flex-1 flex items-center justify-center px-4 py-6 sm:py-8">
+                <div class="login-card-container">
+                    <!-- Icon & Title -->
+                    <div class="text-center mb-7">
+                        <div class="login-app-icon-lg" style="width:56px;height:56px;border-radius:18px;background:linear-gradient(135deg,#10b981 0%,#2dd4bf 100%);display:inline-flex;align-items:center;justify-content:center;box-shadow:0 10px 25px -5px rgba(16,185,129,0.35);margin-bottom:16px;">
+                            <svg style="width:30px;height:30px;color:#ffffff;" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                                <path d="M3 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"></path>
+                                <path d="M13 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0"></path>
+                                <path d="M9 17v-13h10v13"></path>
+                                <path d="M9 8h10"></path>
+                            </svg>
+                        </div>
+                        <h1 class="text-2xl font-bold tracking-tight text-slate-900">Masuk ke Akun</h1>
+                    </div>
+
+                    <!-- Input Fields -->
+                    <div class="space-y-4">
+                        <!-- Email or Username -->
+                        <div>
+                            <label class="login-field-label" for="loginEmail">Email atau Username</label>
+                            <div class="login-input-wrap">
+                                <span class="input-icon-left">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                                    </svg>
+                                </span>
+                                <input id="loginEmail" type="text" placeholder="Masukan akun" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()">
+                            </div>
+                        </div>
+
+                        <!-- Password -->
+                        <div>
+                            <label class="login-field-label" for="loginPassword">Password</label>
+                            <div class="login-input-wrap">
+                                <span class="input-icon-left">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                                    </svg>
+                                </span>
+                                <input id="loginPassword" type="password" class="has-toggle" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+                                <button type="button" id="togglePassword" class="input-btn-right" aria-label="Tampilkan atau sembunyikan password">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                                        <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Options: Ingat Saya & Lupa Password -->
+                        <div class="flex items-center justify-between pt-1 pb-1">
+                            <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-medium text-slate-600">
+                                <input class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer" style="accent-color: #10b981;" name="remember" type="checkbox">
+                                <span>Ingat Saya</span>
+                            </label>
+                            <a class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline transition" href="#lupa-password" onclick="toast('Silakan hubungi administrator untuk mereset password'); return false;">
+                                Lupa Password?
+                            </a>
+                        </div>
+
+                        <!-- Masuk Button -->
+                        <div class="pt-2">
+                            <button type="button" class="login-btn-primary" onclick="doLogin()">
+                                <span>Masuk</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="my-5 flex items-center gap-3">
+                            <div class="h-px flex-1 bg-slate-200"></div>
+                            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">ATAU GUNAKAN</span>
+                            <div class="h-px flex-1 bg-slate-200"></div>
+                        </div>
+
+                        <!-- Mode Host Button -->
+                        <div>
+                            <button type="button" class="login-btn-secondary" onclick="openHostScreen()" title="Masuk sebagai terminal penerima broadcast musik">
+                                <span class="p-1 rounded-md bg-emerald-50 text-emerald-600">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+                                    </svg>
+                                </span>
+                                <span class="font-bold text-slate-800 text-xs sm:text-sm">Mode Host</span>
+                                <span class="text-slate-500 text-xs font-normal">— Layar penerima Broadcast</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            
+    <!-- BOTTOM PLAYER BAR -->
+    <div id="bottomPlayerBar" class="hidden fixed bottom-0 left-0 right-0 md:left-60 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_24px_rgba(0,0,0,0.1)] px-4 py-2.5 transition-all duration-300">
+        <!-- Clickable Top Progress Bar -->
+        <div class="absolute -top-1 left-0 right-0 h-2 cursor-pointer group flex items-center" onclick="seekTrack(event)" title="Klik untuk geser durasi">
+            <div class="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div id="bottomPlayerProgress" class="h-full bg-emerald-500 rounded-full transition-none" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-3 max-w-6xl mx-auto w-full">
+            <!-- Left: Track Info -->
+            <div class="flex items-center gap-3 min-w-0 w-1/3 sm:w-1/4">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shrink-0 shadow-sm">
+                    <span class="material-symbols-outlined text-[20px]" id="bottomTrackIcon">music_note</span>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p id="bottomTrackTitle" class="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">Memuat lagu...</p>
+                    <div class="flex items-center gap-1.5 mt-0.5">
+                        <span id="bottomTrackBadge" class="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-800">Lokal</span>
+                        <span id="bottomTrackTime" class="text-[11px] text-slate-500 dark:text-slate-400 font-mono">0:00 / 0:00</span>
                     </div>
                 </div>
             </div>
+
+            <!-- Center: Playback Controls -->
+            <div class="flex items-center justify-center gap-1 sm:gap-2">
+                <button id="bottomShuffleBtn" class="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg transition" onclick="toggleShuffle()" title="Acak Lagu">
+                    <span class="material-symbols-outlined text-[18px]">shuffle</span>
+                </button>
+                <button class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 transition" onclick="prevTrack()" title="Sebelumnya">
+                    <span class="material-symbols-outlined text-[20px]">skip_previous</span>
+                </button>
+                <button class="w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white flex items-center justify-center shadow-md transition" onclick="togglePlayPause()" title="Putar / Jeda">
+                    <span class="material-symbols-outlined text-[22px]" id="bottomPlayPauseIcon">play_arrow</span>
+                </button>
+                <button class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 transition" onclick="nextTrack()" title="Berikutnya">
+                    <span class="material-symbols-outlined text-[20px]">skip_next</span>
+                </button>
+                <button id="bottomRepeatBtn" class="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg transition" onclick="toggleRepeat()" title="Ulangi Lagu">
+                    <span class="material-symbols-outlined text-[18px]">repeat</span>
+                </button>
+            </div>
+
+            <!-- Right: Volume & Stop Controls -->
+            <div class="flex items-center justify-end gap-2 w-1/3 sm:w-1/4">
+                <div class="hidden sm:flex items-center gap-2">
+                    <button onclick="toggleMute()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200" title="Mute">
+                        <span class="material-symbols-outlined text-[18px]" id="bottomVolumeIcon">volume_up</span>
+                    </button>
+                    <input type="range" id="bottomVolumeSlider" min="0" max="100" value="70" class="w-20 lg:w-28 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-600" oninput="setMasterVolume(this.value)">
+                    <span id="bottomVolumeLabel" class="text-xs font-mono font-semibold text-slate-600 dark:text-slate-300 w-8 text-right">70%</span>
+                </div>
+                <button onclick="stopPlayback()" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800 rounded-lg transition ml-1" title="Hentikan Musik">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</main>
+
+            <!-- Footer -->
+            <footer class="px-6 py-5 text-center text-xs text-slate-400 flex-shrink-0">
+                <div class="flex items-center justify-center gap-2">
+                    <span>by deni s 2026</span>
+                    <span class="w-1 h-1 rounded-full bg-slate-400"></span>
+                    <span class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span class="text-slate-500">Server Aktif</span>
+                    </span>
+                </div>
+            </footer>
         </div>
 
         <!-- APP PAGES -->
@@ -543,64 +936,365 @@
 
         <!-- SHOLAT -->
         <div class="page" id="page-sholat">
-            <h2 class="text-lg font-bold mb-3">Jadwal Sholat</h2>
-            <!-- CARD 1: Lokasi -->
-            <div class="glass-card rounded-xl p-5 mb-4">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="text-sm font-bold flex items-center gap-2"><span class="material-symbols-outlined text-[18px]">location_on</span> Lokasi</h3>
-                    <button class="text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 text-white" style="background:#50C878" onclick="autoDetectLocation()"><span class="material-symbols-outlined text-[14px]">my_location</span> Auto Detect</button>
+            <!-- Breadcrumbs & Section Title -->
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-3 border-b border-slate-200 mb-6">
+                <div>
+                    <div class="flex items-center space-x-2 text-xs text-slate-500 mb-1">
+                        <span>Sistem Otomasi</span>
+                        <span>•</span>
+                        <span class="text-emerald-700 font-semibold">Jadwal Sholat &amp; Adzan</span>
+                    </div>
+                    <h2 class="text-2xl font-bold text-slate-900 tracking-tight">Jadwal Sholat &amp; Pengaturan Adzan</h2>
+                    <p class="text-xs text-slate-500 mt-1">Otomatisasi pemutaran audio adzan, doa setelah adzan, dan jeda musik berdasarkan koordinat GPS dan waktu sholat lokal.</p>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-2 items-end">
-                    <div><label class="text-[11px] text-on-surface-variant">Latitude</label><input type="number" class="w-full px-2.5 py-1.5 text-sm border border-outline-variant rounded-lg mt-0.5" id="latInput" step="0.0001"></div>
-                    <div><label class="text-[11px] text-on-surface-variant">Longitude</label><input type="number" class="w-full px-2.5 py-1.5 text-sm border border-outline-variant rounded-lg mt-0.5" id="lngInput" step="0.0001"></div>
+                <!-- Quick Status Pills -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5"></span>
+                        Otomatisasi: Aktif
+                    </span>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                        Kemenag RI / MABIMS
+                    </span>
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                        WIB (UTC+7)
+                    </span>
                 </div>
-                <p class="text-[11px] text-on-surface-variant mt-2" id="locationStatus">Lokasi default: Jakarta</p>
             </div>
-            <!-- CARD 2 & 3 -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div class="glass-card rounded-xl p-5">
-                    <h3 class="text-sm font-bold flex items-center gap-2 mb-1"><span class="material-symbols-outlined text-[18px]">schedule</span> Jam Sholat</h3>
-                    <p class="text-[11px] text-on-surface-variant mb-3">Geser - / + untuk koreksi tiap waktu</p>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="prayerGrid"></div>
-                </div>
-                <div class="glass-card rounded-xl p-5">
-                    <h3 class="text-sm font-bold flex items-center gap-2 mb-3"><span class="material-symbols-outlined text-[18px]">volume_up</span> Pengaturan Adzan & Doa</h3>
-                    <div class="space-y-3">
-                        <p class="text-[11px] font-bold text-on-surface-variant -mb-1">Audio Adzan per Waktu — sumber dari Library</p>
-                        <div class="space-y-2" id="adzanPerWaktuList">
-                            <div class="p-2.5 rounded-lg bg-gray-50 border border-outline-variant">
-                                <div class="flex items-center gap-2 flex-wrap mb-1.5"><span class="text-xs w-16 font-bold">Subuh</span><select id="adzanTrack_Subuh" class="flex-1 text-xs px-2 py-1 border border-outline-variant rounded" onchange="saveSettings()"><option value="">— pilih dari library —</option></select><button class="text-[11px] px-2 py-1 border border-outline-variant rounded shrink-0" onclick="previewAdzan('Subuh')">Test</button></div>
-                                <div class="flex items-center gap-2 pl-[72px]"><span class="material-symbols-outlined text-[14px] text-on-surface-variant">volume_up</span><input type="range" min="0" max="100" value="90" id="adzan_Subuh_r" class="flex-1" oninput="volSetValue('adzan_Subuh',this.value)" onchange="saveSettings()"><input type="number" min="0" max="100" value="90" id="adzan_Subuh_n" class="w-12 text-xs px-1 py-0.5 border border-outline-variant rounded text-center" oninput="volSetValue('adzan_Subuh',this.value)" onchange="saveSettings()"><span class="text-xs w-8" id="adzan_Subuh_l">90%</span></div>
-                            </div>
-                            <div class="p-2.5 rounded-lg bg-gray-50 border border-outline-variant">
-                                <div class="flex items-center gap-2 flex-wrap mb-1.5"><span class="text-xs w-16 font-bold">Dzuhur</span><select id="adzanTrack_Dzuhur" class="flex-1 text-xs px-2 py-1 border border-outline-variant rounded" onchange="saveSettings()"><option value="">— pilih dari library —</option></select><button class="text-[11px] px-2 py-1 border border-outline-variant rounded shrink-0" onclick="previewAdzan('Dzuhur')">Test</button></div>
-                                <div class="flex items-center gap-2 pl-[72px]"><span class="material-symbols-outlined text-[14px] text-on-surface-variant">volume_up</span><input type="range" min="0" max="100" value="80" id="adzan_Dzuhur_r" class="flex-1" oninput="volSetValue('adzan_Dzuhur',this.value)" onchange="saveSettings()"><input type="number" min="0" max="100" value="80" id="adzan_Dzuhur_n" class="w-12 text-xs px-1 py-0.5 border border-outline-variant rounded text-center" oninput="volSetValue('adzan_Dzuhur',this.value)" onchange="saveSettings()"><span class="text-xs w-8" id="adzan_Dzuhur_l">80%</span></div>
-                            </div>
-                            <div class="p-2.5 rounded-lg bg-gray-50 border border-outline-variant">
-                                <div class="flex items-center gap-2 flex-wrap mb-1.5"><span class="text-xs w-16 font-bold">Ashar</span><select id="adzanTrack_Ashar" class="flex-1 text-xs px-2 py-1 border border-outline-variant rounded" onchange="saveSettings()"><option value="">— pilih dari library —</option></select><button class="text-[11px] px-2 py-1 border border-outline-variant rounded shrink-0" onclick="previewAdzan('Ashar')">Test</button></div>
-                                <div class="flex items-center gap-2 pl-[72px]"><span class="material-symbols-outlined text-[14px] text-on-surface-variant">volume_up</span><input type="range" min="0" max="100" value="80" id="adzan_Ashar_r" class="flex-1" oninput="volSetValue('adzan_Ashar',this.value)" onchange="saveSettings()"><input type="number" min="0" max="100" value="80" id="adzan_Ashar_n" class="w-12 text-xs px-1 py-0.5 border border-outline-variant rounded text-center" oninput="volSetValue('adzan_Ashar',this.value)" onchange="saveSettings()"><span class="text-xs w-8" id="adzan_Ashar_l">80%</span></div>
-                            </div>
-                            <div class="p-2.5 rounded-lg bg-gray-50 border border-outline-variant">
-                                <div class="flex items-center gap-2 flex-wrap mb-1.5"><span class="text-xs w-16 font-bold">Maghrib</span><select id="adzanTrack_Maghrib" class="flex-1 text-xs px-2 py-1 border border-outline-variant rounded" onchange="saveSettings()"><option value="">— pilih dari library —</option></select><button class="text-[11px] px-2 py-1 border border-outline-variant rounded shrink-0" onclick="previewAdzan('Maghrib')">Test</button></div>
-                                <div class="flex items-center gap-2 pl-[72px]"><span class="material-symbols-outlined text-[14px] text-on-surface-variant">volume_up</span><input type="range" min="0" max="100" value="80" id="adzan_Maghrib_r" class="flex-1" oninput="volSetValue('adzan_Maghrib',this.value)" onchange="saveSettings()"><input type="number" min="0" max="100" value="80" id="adzan_Maghrib_n" class="w-12 text-xs px-1 py-0.5 border border-outline-variant rounded text-center" oninput="volSetValue('adzan_Maghrib',this.value)" onchange="saveSettings()"><span class="text-xs w-8" id="adzan_Maghrib_l">80%</span></div>
-                            </div>
-                            <div class="p-2.5 rounded-lg bg-gray-50 border border-outline-variant">
-                                <div class="flex items-center gap-2 flex-wrap mb-1.5"><span class="text-xs w-16 font-bold">Isya</span><select id="adzanTrack_Isya" class="flex-1 text-xs px-2 py-1 border border-outline-variant rounded" onchange="saveSettings()"><option value="">— pilih dari library —</option></select><button class="text-[11px] px-2 py-1 border border-outline-variant rounded shrink-0" onclick="previewAdzan('Isya')">Test</button></div>
-                                <div class="flex items-center gap-2 pl-[72px]"><span class="material-symbols-outlined text-[14px] text-on-surface-variant">volume_up</span><input type="range" min="0" max="100" value="80" id="adzan_Isya_r" class="flex-1" oninput="volSetValue('adzan_Isya',this.value)" onchange="saveSettings()"><input type="number" min="0" max="100" value="80" id="adzan_Isya_n" class="w-12 text-xs px-1 py-0.5 border border-outline-variant rounded text-center" oninput="volSetValue('adzan_Isya',this.value)" onchange="saveSettings()"><span class="text-xs w-8" id="adzan_Isya_l">80%</span></div>
-                            </div>
+
+            <!-- BEGIN: Section 1 - Lokasi GPS Card -->
+            <section class="bg-white rounded-xl border border-slate-200 shadow-xs p-5 mb-6 transition hover:border-slate-300" data-purpose="gps-location-card">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke-linecap="round" stroke-linejoin="round"></path><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
                         </div>
-                        <div class="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50"><span class="text-xs w-24 font-bold">Doa Setelah</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="doaEnabled" class="sr-only peer" onchange="saveSettings()"><div class="w-14 h-6 bg-gray-300 rounded-full peer-checked:bg-[#50C878] transition-colors after:content-['OFF'] after:flex after:items-center after:justify-center after:absolute after:top-[3px] after:left-[3px] after:w-7 after:h-[18px] after:bg-white after:rounded-full after:shadow-sm after:text-[9px] after:font-bold after:text-gray-400 after:transition-all after:duration-200 peer-checked:after:translate-x-[22px] peer-checked:after:content-['ON'] peer-checked:after:text-[#2f8f55]"></div></label></div>
-                        <div class="flex items-center gap-3 p-2.5 rounded-lg bg-[#eef6f0] flex-wrap"><span class="text-xs w-24 font-bold">Musik Setelah Adzan</span><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" id="playAfterAdzan" class="sr-only peer" onchange="saveSettings()"><div class="w-14 h-6 bg-gray-300 rounded-full peer-checked:bg-[#50C878] transition-colors after:content-['OFF'] after:flex after:items-center after:justify-center after:absolute after:top-[3px] after:left-[3px] after:w-7 after:h-[18px] after:bg-white after:rounded-full after:shadow-sm after:text-[9px] after:font-bold after:text-gray-400 after:transition-all after:duration-200 peer-checked:after:translate-x-[22px] peer-checked:after:content-['ON'] peer-checked:after:text-[#2f8f55]"></div></label><span class="text-xs ml-1">Delay</span><input type="number" min="0" max="60" value="10" id="afterAdzanDelay" class="w-14 px-2 py-1 text-xs border border-outline-variant rounded" onchange="saveSettings()"><span class="text-xs">menit</span></div>
                         <div>
-                            <div class="flex items-center gap-3 flex-wrap mb-1"><span class="text-xs w-24 font-bold">Audio Doa</span><select id="doaTrack" class="flex-1 text-xs px-2 py-1 border border-outline-variant rounded" onchange="saveSettings()"><option value="">— pilih dari library —</option></select></div>
-                            <div class="flex items-center gap-3 flex-wrap pl-[104px]"><span class="text-xs font-bold">Volume</span><input type="range" min="0" max="100" value="70" id="doavol_r" class="flex-1" oninput="volSetValue('doavol',this.value)" onchange="saveSettings()"><input type="number" min="0" max="100" value="70" id="doavol_n" class="w-12 text-xs px-1 py-0.5 border border-outline-variant rounded text-center" oninput="volSetValue('doavol',this.value)" onchange="saveSettings()"><span class="text-xs w-8" id="doavol_l">70%</span><button class="text-[11px] px-2 py-1 border border-outline-variant rounded" onclick="previewAdzan('doa')">Test</button></div>
+                            <h3 class="text-sm font-bold text-slate-900">Koordinat &amp; Lokasi Musholla/Masjid</h3>
+                            <p class="text-xs text-slate-500">Koordinat akurat digunakan untuk menghitung rumus hisab astronomi waktu sholat harian.</p>
                         </div>
                     </div>
-                    <p class="text-[11px] text-on-surface-variant mt-3" id="adzanStatus"></p>
-                    <p class="text-[10px] text-on-surface-variant mt-2">Semua audio adzan/doa dipilih dari <b>Library</b>. Pengaturan tersimpan otomatis ke database &mdash; jika lagu lokal belum ada di perangkat ini akan muncul keterangan <b>"file lokal tidak tersedia"</b>.</p>
+                    <div class="flex items-center space-x-2">
+                        <button class="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition active:scale-95" onclick="autoDetectLocation()">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 18a8 8 0 110-16 8 8 0 010 16zm1-13h-2v4H7v2h4v4h2v-4h4v-2h-4V7z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                            <span>Auto Detect GPS</span>
+                        </button>
+                        <button class="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 transition" onclick="openCityPicker()">
+                            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                            <span>Pilih Kota</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <!-- Latitude -->
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Latitude (Garis Lintang)</label>
+                        <div class="relative">
+                            <input class="w-full text-xs font-mono bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none" type="number" id="latInput" step="0.0001" onchange="onManualLocationChange()">
+                            <span class="absolute right-3 top-2.5 text-[10px] text-slate-400 font-mono">LS/LU</span>
+                        </div>
+                    </div>
+                    <!-- Longitude -->
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Longitude (Garis Bujur)</label>
+                        <div class="relative">
+                            <input class="w-full text-xs font-mono bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none" type="number" id="lngInput" step="0.0001" onchange="onManualLocationChange()">
+                            <span class="absolute right-3 top-2.5 text-[10px] text-slate-400 font-mono">BT/BB</span>
+                        </div>
+                    </div>
+                    <!-- Calculation Method -->
+                    <div class="md:col-span-4">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Metode Kalkulasi Subuh / Ashar</label>
+                        <select id="calcMethodSelect" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:bg-white focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
+                            <option value="kemenag" selected>Kementerian Agama RI (20.0° Subuh, 18.0° Isya)</option>
+                            <option value="muhammadiyah">Majelis Tarjih Muhammadiyah (-18°)</option>
+                            <option value="isna">Islamic Society of North America (ISNA)</option>
+                            <option value="mwl">Muslim World League (MWL)</option>
+                            <option value="makkah">Umm Al-Qura University, Makkah</option>
+                        </select>
+                    </div>
+                </div>
+                <!-- Location Detection Result Bar -->
+                <div class="mt-3.5 pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-600 gap-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Lokasi Terdeteksi: <strong class="text-slate-800" id="locationStatus">Jakarta</strong></span>
+                        <span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-semibold" id="locationAccuracyBadge">Akurasi GPS / Kemenag RI</span>
+                    </div>
+                    <span class="text-slate-400 text-[11px]" id="locationDetailsText">Koreksi Ihtiyat: +2 Menit (Standar Kemenag)</span>
+                </div>
+            </section>
+            <!-- END: Section 1 - Lokasi GPS Card -->
+
+            <!-- BEGIN: Section 2 - Jadwal Jam Sholat & Koreksi Grid -->
+            <section class="space-y-3 mb-6" data-purpose="prayer-times-grid">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900 flex items-center space-x-2">
+                            <span>Waktu Sholat Hari Ini</span>
+                            <span class="text-xs font-normal text-slate-500">| Geser atau tekan - / + untuk koreksi manual (menit)</span>
+                        </h3>
+                    </div>
+                    <div class="text-xs bg-emerald-50/80 border border-emerald-200/80 text-emerald-800 font-semibold px-3 py-1 rounded-lg flex items-center gap-1.5" id="sholatDateBadge">
+                        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                        <span id="sholatDateText">Memuat waktu sholat...</span>
+                    </div>
+                </div>
+                <!-- Dynamic Prayer Cards Grid: Imsak, Subuh, Terbit, Dzuhur, Ashar, Maghrib, Isya -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3" id="prayerGrid"></div>
+            </section>
+            <!-- END: Section 2 - Jadwal Jam Sholat & Koreksi Grid -->
+
+            <!-- BEGIN: Section 3 - Pengaturan Audio Adzan & Doa -->
+            <section class="bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-6 mb-6" data-purpose="audio-settings-card">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">Pengaturan Audio Adzan per Waktu Sholat</h3>
+                            <p class="text-xs text-slate-500">Audio Adzan diambil dari daftar perpustakaan (Library) yang telah tersimpan di sistem.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2 text-xs">
+                        <span class="text-slate-500">Status File:</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-100 text-emerald-800" id="adzanReadyBadge">Audio Siap</span>
+                    </div>
+                </div>
+
+                <!-- Audio Rows Stack (Subuh, Dzuhur, Ashar, Maghrib, Isya) -->
+                <div class="space-y-3.5" id="adzanPerWaktuList">
+                    <!-- Row 1: Subuh -->
+                    <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div class="flex items-center space-x-3 w-40 shrink-0">
+                            <span class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs">01</span>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-800">Adzan Subuh</h4>
+                                <p class="text-[11px] text-slate-500" id="adzanTime_Subuh">--:-- WIB</p>
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-[240px]">
+                            <select id="adzanTrack_Subuh" class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:ring-1 focus:ring-emerald-500 outline-none" onchange="saveSettings()"><option value="">— pilih dari library —</option></select>
+                        </div>
+                        <div class="flex items-center space-x-3 shrink-0">
+                            <div class="flex items-center space-x-2 w-48">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15.536 8.464a5 5 0 010 7.072m-4.536-1.072v-2a1 1 0 00-1-1h-2a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                <input type="range" min="0" max="100" value="90" id="adzan_Subuh_r" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" oninput="volSetValue('adzan_Subuh',this.value)" onchange="saveSettings()">
+                                <input type="number" min="0" max="100" value="90" id="adzan_Subuh_n" class="w-12 text-xs px-1.5 py-0.5 border border-slate-300 rounded text-center font-mono" oninput="volSetValue('adzan_Subuh',this.value)" onchange="saveSettings()">
+                                <span class="text-xs font-mono font-semibold text-slate-700 w-8 text-right" id="adzan_Subuh_l">90%</span>
+                            </div>
+                            <button class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg shadow-2xs transition" onclick="previewAdzan('Subuh')">
+                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                                <span>Test</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Dzuhur -->
+                    <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div class="flex items-center space-x-3 w-40 shrink-0">
+                            <span class="w-8 h-8 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs">02</span>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-800">Adzan Dzuhur</h4>
+                                <p class="text-[11px] text-slate-500" id="adzanTime_Dzuhur">--:-- WIB</p>
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-[240px]">
+                            <select id="adzanTrack_Dzuhur" class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:ring-1 focus:ring-emerald-500 outline-none" onchange="saveSettings()"><option value="">— pilih dari library —</option></select>
+                        </div>
+                        <div class="flex items-center space-x-3 shrink-0">
+                            <div class="flex items-center space-x-2 w-48">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15.536 8.464a5 5 0 010 7.072m-4.536-1.072v-2a1 1 0 00-1-1h-2a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                <input type="range" min="0" max="100" value="80" id="adzan_Dzuhur_r" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" oninput="volSetValue('adzan_Dzuhur',this.value)" onchange="saveSettings()">
+                                <input type="number" min="0" max="100" value="80" id="adzan_Dzuhur_n" class="w-12 text-xs px-1.5 py-0.5 border border-slate-300 rounded text-center font-mono" oninput="volSetValue('adzan_Dzuhur',this.value)" onchange="saveSettings()">
+                                <span class="text-xs font-mono font-semibold text-slate-700 w-8 text-right" id="adzan_Dzuhur_l">80%</span>
+                            </div>
+                            <button class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg shadow-2xs transition" onclick="previewAdzan('Dzuhur')">
+                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                                <span>Test</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Ashar -->
+                    <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div class="flex items-center space-x-3 w-40 shrink-0">
+                            <span class="w-8 h-8 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs">03</span>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-800">Adzan Ashar</h4>
+                                <p class="text-[11px] text-slate-500" id="adzanTime_Ashar">--:-- WIB</p>
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-[240px]">
+                            <select id="adzanTrack_Ashar" class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:ring-1 focus:ring-emerald-500 outline-none" onchange="saveSettings()"><option value="">— pilih dari library —</option></select>
+                        </div>
+                        <div class="flex items-center space-x-3 shrink-0">
+                            <div class="flex items-center space-x-2 w-48">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15.536 8.464a5 5 0 010 7.072m-4.536-1.072v-2a1 1 0 00-1-1h-2a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                <input type="range" min="0" max="100" value="80" id="adzan_Ashar_r" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" oninput="volSetValue('adzan_Ashar',this.value)" onchange="saveSettings()">
+                                <input type="number" min="0" max="100" value="80" id="adzan_Ashar_n" class="w-12 text-xs px-1.5 py-0.5 border border-slate-300 rounded text-center font-mono" oninput="volSetValue('adzan_Ashar',this.value)" onchange="saveSettings()">
+                                <span class="text-xs font-mono font-semibold text-slate-700 w-8 text-right" id="adzan_Ashar_l">80%</span>
+                            </div>
+                            <button class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg shadow-2xs transition" onclick="previewAdzan('Ashar')">
+                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                                <span>Test</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Row 4: Maghrib -->
+                    <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div class="flex items-center space-x-3 w-40 shrink-0">
+                            <span class="w-8 h-8 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs">04</span>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-800">Adzan Maghrib</h4>
+                                <p class="text-[11px] text-slate-500" id="adzanTime_Maghrib">--:-- WIB</p>
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-[240px]">
+                            <select id="adzanTrack_Maghrib" class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:ring-1 focus:ring-emerald-500 outline-none" onchange="saveSettings()"><option value="">— pilih dari library —</option></select>
+                        </div>
+                        <div class="flex items-center space-x-3 shrink-0">
+                            <div class="flex items-center space-x-2 w-48">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15.536 8.464a5 5 0 010 7.072m-4.536-1.072v-2a1 1 0 00-1-1h-2a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                <input type="range" min="0" max="100" value="85" id="adzan_Maghrib_r" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" oninput="volSetValue('adzan_Maghrib',this.value)" onchange="saveSettings()">
+                                <input type="number" min="0" max="100" value="85" id="adzan_Maghrib_n" class="w-12 text-xs px-1.5 py-0.5 border border-slate-300 rounded text-center font-mono" oninput="volSetValue('adzan_Maghrib',this.value)" onchange="saveSettings()">
+                                <span class="text-xs font-mono font-semibold text-slate-700 w-8 text-right" id="adzan_Maghrib_l">85%</span>
+                            </div>
+                            <button class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg shadow-2xs transition" onclick="previewAdzan('Maghrib')">
+                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                                <span>Test</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Row 5: Isya -->
+                    <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-slate-50 transition flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div class="flex items-center space-x-3 w-40 shrink-0">
+                            <span class="w-8 h-8 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs">05</span>
+                            <div>
+                                <h4 class="text-xs font-bold text-slate-800">Adzan Isya</h4>
+                                <p class="text-[11px] text-slate-500" id="adzanTime_Isya">--:-- WIB</p>
+                            </div>
+                        </div>
+                        <div class="flex-1 min-w-[240px]">
+                            <select id="adzanTrack_Isya" class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:ring-1 focus:ring-emerald-500 outline-none" onchange="saveSettings()"><option value="">— pilih dari library —</option></select>
+                        </div>
+                        <div class="flex items-center space-x-3 shrink-0">
+                            <div class="flex items-center space-x-2 w-48">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15.536 8.464a5 5 0 010 7.072m-4.536-1.072v-2a1 1 0 00-1-1h-2a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                <input type="range" min="0" max="100" value="80" id="adzan_Isya_r" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" oninput="volSetValue('adzan_Isya',this.value)" onchange="saveSettings()">
+                                <input type="number" min="0" max="100" value="80" id="adzan_Isya_n" class="w-12 text-xs px-1.5 py-0.5 border border-slate-300 rounded text-center font-mono" oninput="volSetValue('adzan_Isya',this.value)" onchange="saveSettings()">
+                                <span class="text-xs font-mono font-semibold text-slate-700 w-8 text-right" id="adzan_Isya_l">80%</span>
+                            </div>
+                            <button class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg shadow-2xs transition" onclick="previewAdzan('Isya')">
+                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                                <span>Test</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Global Automation Rules: Doa & Music Pause -->
+                <div class="mt-6 pt-5 border-t border-slate-200 grid grid-cols-1 lg:grid-cols-2 gap-5">
+                    <!-- Doa Setelah Adzan Box -->
+                    <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/40 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                <h4 class="text-xs font-bold text-slate-800">Doa Setelah Adzan Otomatis</h4>
+                            </div>
+                            <!-- Toggle Switch -->
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="doaEnabled" class="sr-only peer" onchange="saveSettings()">
+                                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                        </div>
+                        <p class="text-[11px] text-slate-500">Putar lantunan doa sesudah adzan secara langsung setelah kumandang adzan selesai (jeda otomatis 2 detik).</p>
+                        <div class="space-y-1.5">
+                            <label class="text-[11px] font-semibold text-slate-600">Pilihan Audio Doa:</label>
+                            <select id="doaTrack" class="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:ring-1 focus:ring-emerald-500 outline-none" onchange="saveSettings()"><option value="">— pilih dari library —</option></select>
+                        </div>
+                        <div class="flex items-center justify-between pt-1">
+                            <div class="flex items-center space-x-2 w-48">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15.536 8.464a5 5 0 010 7.072m-4.536-1.072v-2a1 1 0 00-1-1h-2a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                                <input type="range" min="0" max="100" value="70" id="doavol_r" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" oninput="volSetValue('doavol',this.value)" onchange="saveSettings()">
+                                <input type="number" min="0" max="100" value="70" id="doavol_n" class="w-12 text-xs px-1.5 py-0.5 border border-slate-300 rounded text-center font-mono" oninput="volSetValue('doavol',this.value)" onchange="saveSettings()">
+                                <span class="text-xs font-mono font-semibold text-slate-700 w-8 text-right" id="doavol_l">70%</span>
+                            </div>
+                            <button class="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg shadow-2xs transition" onclick="previewAdzan('doa')">
+                                <svg class="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                                <span>Test Doa</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Jeda / Mute Musik Selama Sholat -->
+                    <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/40 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                <h4 class="text-xs font-bold text-slate-800">Manajemen Musik &amp; Bel Sekolah</h4>
+                            </div>
+                            <!-- Toggle Switch -->
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="playAfterAdzan" class="sr-only peer" onchange="saveSettings()">
+                                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                        </div>
+                        <p class="text-[11px] text-slate-500">Secara otomatis menghentikan sementara (pause) musik latar dan bel masuk/istirahat saat adzan dan ibadah sholat berlangsung.</p>
+                        <div class="grid grid-cols-2 gap-3 pt-1">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Hentikan Musik Sebelum:</label>
+                                <div class="flex items-center space-x-1.5">
+                                    <span class="w-16 text-xs bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono text-center font-bold text-slate-700">5</span>
+                                    <span class="text-xs text-slate-500">Menit</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Mute Speaker Setelah:</label>
+                                <div class="flex items-center space-x-1.5">
+                                    <input class="w-16 text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 font-mono text-center font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 outline-none" type="number" min="0" max="60" value="10" id="afterAdzanDelay" onchange="saveSettings()">
+                                    <span class="text-xs text-slate-500">Menit</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pt-1 text-[11px] text-slate-500 flex items-center space-x-1.5">
+                            <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                            <span>Semua speaker koridor &amp; ruangan diprioritaskan untuk Adzan.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Audit Log & Local Files Notice -->
+                <div class="p-3.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs text-slate-600 flex items-start space-x-3">
+                    <svg class="w-4 h-4 text-slate-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    <div class="flex-1">
+                        <p class="font-bold text-slate-700">Status Validasi Audio &amp; Basis Data:</p>
+                        <p class="text-[11px] text-slate-500 mt-0.5" id="adzanStatus">Semua file audio adzan/doa tersimpan otomatis di basis data cloud &amp; memori lokal perangkat Smart Scheduler.</p>
+                    </div>
+                </div>
+            </section>
+            <!-- END: Section 3 - Pengaturan Audio Adzan & Doa -->
+
+            <!-- BEGIN: Bottom Action Bar -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3" data-purpose="action-bar">
+                <div class="flex items-center space-x-2 text-xs text-slate-500">
+                    <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    <span id="sholatSaveStatus">Pengaturan sinkron dengan memori perangkat &amp; database.</span>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button type="button" class="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg transition" onclick="resetSholatOffsets()">
+                        Kembalikan ke Default
+                    </button>
+                    <button type="button" class="inline-flex items-center space-x-2 px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-lg shadow-sm transition disabled:opacity-60" onclick="saveSholatSettings(this)">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                        <span>Simpan Pengaturan Jadwal Sholat</span>
+                    </button>
                 </div>
             </div>
-            <div class="mt-4"><button class="w-full py-2.5 text-sm font-bold text-white rounded-lg flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-wait" style="background:#50C878" onclick="saveSholatSettings(this)"><span>Simpan Pengaturan Jadwal Sholat</span></button><p class="text-center text-[11px] mt-1.5 hidden" id="sholatSaveStatus"></p></div>
+            <!-- END: Bottom Action Bar -->
         </div>
 
         <!-- ADMIN -->
@@ -746,6 +1440,18 @@
             <button class="px-5 py-2.5 rounded-xl text-xs font-bold border border-red-400/30 bg-red-500/20 hover:bg-red-500/40 text-red-200" onclick="resetHostDevice()">🔄 Pasang Ulang Kode Baru</button>
         </div>
     </div>
+
+    <script>
+      (function(){
+        const btn=document.getElementById('togglePassword');
+        const input=document.getElementById('loginPassword');
+        if(btn&&input){btn.addEventListener('click',function(){
+          const isPwd=input.getAttribute('type')==='password';
+          input.setAttribute('type',isPwd?'text':'password');
+          btn.innerHTML=isPwd?'<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" /></svg>':'<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>';
+        });}
+      })();
+    </script>
 
     <script type="module" src="/src/main.js"></script>
 </body>

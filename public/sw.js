@@ -1,5 +1,5 @@
-const CACHE_NAME = 'musik-pintar-v4';
-const AUDIO_CACHE = 'musik-pintar-audio';
+const CACHE_NAME = 'musik-pintar-v7';
+const AUDIO_CACHE = 'musik-pintar-audio-v4';
 
 // Install
 self.addEventListener('install', event => {
@@ -31,14 +31,24 @@ self.addEventListener('activate', event => {
 
 // Fetch - Network first with cache fallback for HTML, Cache first for audio
 self.addEventListener('fetch', event => {
+    // Only handle GET requests - Cache API does not support POST, PATCH, PUT, DELETE
+    if (event.request.method !== 'GET') {
+        return;
+    }
+
     const url = new URL(event.request.url);
 
-    // Audio files - Cache first for offline playback
+    // Jangan sentuh request lintas domain (Neon, API, CDN), proxy /api/ (Google Drive),
+    // dan request Range (streaming audio/video) — biarkan browser menanganinya langsung.
+    if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || event.request.headers.has('range')) {
+        return;
+    }
+
+    // Audio files (same-origin) - Cache first for offline playback
     if (event.request.destination === 'audio' ||
         url.pathname.endsWith('.mp3') ||
         url.pathname.endsWith('.wav') ||
-        url.pathname.endsWith('.ogg') ||
-        url.pathname.includes('/storage/v1/object/')) {
+        url.pathname.endsWith('.ogg')) {
 
         event.respondWith(
             caches.open(AUDIO_CACHE).then(cache => {
@@ -46,12 +56,14 @@ self.addEventListener('fetch', event => {
                     if (cached) return cached;
 
                     return fetch(event.request).then(response => {
-                        if (response.ok) {
-                            cache.put(event.request, response.clone());
+                        // Only cache successful basic/cors responses
+                        if (response.ok && (response.type === 'basic' || response.type === 'cors')) {
+                            try {
+                                cache.put(event.request, response.clone());
+                            } catch(e) {}
                         }
                         return response;
                     }).catch(() => {
-                        // Return empty response for offline
                         return new Response('', { status: 503, statusText: 'Offline' });
                     });
                 });
@@ -60,13 +72,15 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // HTML/CSS/JS - Network first
+    // HTML/CSS/JS local assets - Network first
     event.respondWith(
         fetch(event.request)
             .then(response => {
-                if (response.ok) {
+                if (response.ok && response.type === 'basic') {
                     const clone = response.clone();
-                    caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+                    caches.open(CACHE_NAME).then(cache => {
+                        try { cache.put(event.request, clone); } catch(e) {}
+                    });
                 }
                 return response;
             })
@@ -77,11 +91,13 @@ self.addEventListener('fetch', event => {
 // Message handler for precaching audio URLs
 self.addEventListener('message', event => {
     if (event.data && event.data.type === 'CACHE_AUDIO') {
-        const urls = event.data.urls;
+        const urls = event.data.urls || [];
         caches.open(AUDIO_CACHE).then(cache => {
             urls.forEach(url => {
                 fetch(url).then(response => {
-                    if (response.ok) cache.put(url, response);
+                    if (response.ok) {
+                        try { cache.put(url, response); } catch(e) {}
+                    }
                 }).catch(() => {});
             });
         });

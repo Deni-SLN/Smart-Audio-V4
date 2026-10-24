@@ -24,3 +24,7 @@ supabase/.temp/
 check_oninput.cjs
 fix_oninput.cjs
 patch.cjs
+.neon
+
+.agents/
+skills-lock.json

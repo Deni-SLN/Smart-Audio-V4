@@ -1,4 +1,6 @@
-import { getSupabase, isSupabaseConfigured, authSignIn, authSignUp, authSignOut, authUpdatePassword, authGetUser, fetchUserProfile, upsertUserProfile, fetchAllUsers, updateUserProfile, deleteUserProfile, saveUserSettings, loadUserSettings, loadSiteConfig, saveSiteConfig } from './lib/supabase.js';
+import './index.css';
+import { getNeonClient, isNeonConfigured, authSignIn, authSignUp, authSignOut, authUpdatePassword, authGetUser, fetchUserProfile, upsertUserProfile, fetchAllUsers, updateUserProfile, deleteUserProfile, saveUserSettings, loadUserSettings, loadSiteConfig, saveSiteConfig } from './lib/neonClient.js';
+import { neonSql } from './lib/neon.js';
 
 // ========== HIJRI ==========
 function gregorianToHijri(gY,gM,gD){const jd=Math.floor(365.25*(gY+4716))+Math.floor(30.6001*(gM<3?gM+13:gM+1))+gD-1524.5;const l=Math.floor(jd-1948439.5+10632);const n=Math.floor((l-1)/10631);const r=l-10631*n+354;const j=Math.floor((10985-r)/5316)*Math.floor((50*r)/17719)+Math.floor(r/5670)*Math.floor((43*r)/15238);const rr=r-Math.floor((30-j)/15)*Math.floor((17719*j)/50)-Math.floor(j/16)*Math.floor((15238*j)/43)+29;const hm=Math.floor((24*rr)/709);const hd=rr-Math.floor((709*hm)/24);const hy=30*n+j-30;return{year:hy,month:hm,day:hd}}
@@ -63,6 +65,13 @@ let _bootSilent=false,_bootTime=Date.now();
 // Bacaan auto-play YouTube host hanya aktif saat perintah 'play' (bukan saat 'load'), agar tidak auto-putar sebelum admin menekan Play
 let _hsWantPlay=false;
 const audio=new Audio();
+audio.onerror=(e)=>{
+    console.error('Audio error:', audio.error, e);
+    const cur = currentPlaylist[currentPlaylistIndex];
+    toast('Gagal memutar audio: ' + (cur?.name || 'File'));
+    isPlaying = false;
+    updatePlayPauseBtn();
+};
 const DAY_NAMES=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
 const PRAYER_NAMES=['Imsak','Subuh','Terbit','Dzuhur','Ashar','Maghrib','Isya'];
 const DEFAULT_PASSWORD='12345678';
@@ -77,6 +86,45 @@ function guessMediaKindFromName(name,url){
     if(/youtube\.com|youtu\.be|\.mp4|\.webm|\.mov|\.m3u8|video/.test(s)) return 'video';
     return 'audio';
 }
+function findAutoMatchAdzanTrack(kind){
+    const pool = (tracks && tracks.length) ? tracks : [];
+    if(!pool.length) return null;
+    const isSubuh = kind === 'Subuh' || kind === 'subuh';
+    const isDoa = kind === 'doa';
+    
+    if(isDoa){
+        return pool.find(t => {
+            const n = (t.name || '').toLowerCase();
+            return (n.includes('doa') && (n.includes('adzan') || n.includes('azan') || n.includes('setelah')));
+        }) || pool.find(t => (t.name || '').toLowerCase().includes('doa')) || null;
+    }
+
+    if(isSubuh){
+        return pool.find(t => {
+            const n = (t.name || '').toLowerCase();
+            return n.includes('subuh') && (n.includes('adzan') || n.includes('azan'));
+        }) || pool.find(t => (t.name || '').toLowerCase().includes('subuh')) || null;
+    }
+
+    const kLower = String(kind).toLowerCase();
+    const specific = pool.find(t => {
+        const n = (t.name || '').toLowerCase();
+        return n.includes(kLower) && (n.includes('adzan') || n.includes('azan'));
+    });
+    if(specific) return specific;
+
+    const reguler = pool.find(t => {
+        const n = (t.name || '').toLowerCase();
+        return (n.includes('adzan') || n.includes('azan')) && !n.includes('subuh');
+    });
+    if(reguler) return reguler;
+
+    return pool.find(t => {
+        const n = (t.name || '').toLowerCase();
+        return n.includes('adzan') || n.includes('azan');
+    }) || null;
+}
+
 function migrateAdzanSettings(){
     if(!settings.adzanVolumes||typeof settings.adzanVolumes!=='object') settings.adzanVolumes={Subuh:90,Dzuhur:80,Ashar:80,Maghrib:80,Isya:80};
     if(!settings.adzanTracks||typeof settings.adzanTracks!=='object') settings.adzanTracks={Subuh:null,Dzuhur:null,Ashar:null,Maghrib:null,Isya:null};
@@ -90,13 +138,38 @@ function migrateAdzanSettings(){
     if(settings.adzanUmumTrackId){
         for(const p of ['Dzuhur','Ashar','Maghrib','Isya']) if(!settings.adzanTracks[p]) settings.adzanTracks[p]=settings.adzanUmumTrackId;
     }
-    // Default volume jika masih null
-    for(const p of ADZAN_PRAYERS){ if(settings.adzanVolumes[p]==null) settings.adzanVolumes[p]=p==='Subuh'?90:80; if(settings.adzanTracks[p]===undefined) settings.adzanTracks[p]=null; }
+    // Auto-match dari library jika masih null / belum dipilih
+    for(const p of ADZAN_PRAYERS){
+        if(settings.adzanVolumes[p]==null) settings.adzanVolumes[p]=p==='Subuh'?90:80;
+        const curId = settings.adzanTracks[p];
+        const valid = curId && tracks.length ? tracks.some(t => t.id === curId) : !!curId;
+        if(!valid){
+            const auto = findAutoMatchAdzanTrack(p);
+            if(auto) settings.adzanTracks[p] = auto.id;
+        }
+    }
+    const curDoa = settings.doaTrackId;
+    const validDoa = curDoa && tracks.length ? tracks.some(t => t.id === curDoa) : !!curDoa;
+    if(!validDoa){
+        const autoDoa = findAutoMatchAdzanTrack('doa');
+        if(autoDoa) settings.doaTrackId = autoDoa.id;
+    }
 }
 function getAdzanTrackIdForPrayer(name){
-    if(settings.adzanTracks&&settings.adzanTracks[name]) return settings.adzanTracks[name];
-    if(name==='Subuh'&&settings.adzanSubuhTrackId) return settings.adzanSubuhTrackId;
-    if(settings.adzanUmumTrackId) return settings.adzanUmumTrackId;
+    if(settings.adzanTracks&&settings.adzanTracks[name]){
+        const exists = tracks.length ? tracks.some(t => t.id === settings.adzanTracks[name]) : true;
+        if(exists) return settings.adzanTracks[name];
+    }
+    if(name==='Subuh'&&settings.adzanSubuhTrackId){
+        const exists = tracks.length ? tracks.some(t => t.id === settings.adzanSubuhTrackId) : true;
+        if(exists) return settings.adzanSubuhTrackId;
+    }
+    if(settings.adzanUmumTrackId){
+        const exists = tracks.length ? tracks.some(t => t.id === settings.adzanUmumTrackId) : true;
+        if(exists) return settings.adzanUmumTrackId;
+    }
+    const auto = findAutoMatchAdzanTrack(name);
+    if(auto) return auto.id;
     return null;
 }
 function getAdzanVolumeForPrayer(name){
@@ -118,28 +191,45 @@ async function doLogin(){
     const input=$('loginEmail').value.trim();
     const password=$('loginPassword').value;
     if(!input||!password){toast('Isi email/username & password');return}
-    if(!isSupabaseConfigured()){toast('Supabase belum dikonfigurasi');return}
+    if(!isNeonConfigured()){toast('Neon Auth belum dikonfigurasi');return}
     try{
         let email=input;
         // Jika input bukan email (tidak ada @), cari email dari username
         if(!input.includes('@')){
-            const sb=getSupabase();
-            const {data:found}=await sb.from('users').select('email').eq('username',input).single();
-            if(!found||!found.email){toast('Username tidak ditemukan');return}
-            email=found.email;
+            let foundEmail=null;
+            if(neonSql){
+                try{
+                    const rows=await neonSql`SELECT email FROM users WHERE LOWER(username) = LOWER(${input}) LIMIT 1`;
+                    if(rows&&rows.length>0&&rows[0].email){
+                        foundEmail=rows[0].email;
+                    }
+                }catch(e){console.warn('neonSql lookup failed:',e)}
+            }
+            if(!foundEmail){
+                try{
+                    const sb=getNeonClient();
+                    if(sb){
+                        const {data:found}=await sb.from('users').select('email').ilike('username',input).single();
+                        if(found&&found.email) foundEmail=found.email;
+                    }
+                }catch(e){}
+            }
+            if(!foundEmail){toast('Username tidak ditemukan');return}
+            email=foundEmail;
         }
         const authData=await authSignIn(email,password);
         const profile=await fetchUserProfile(authData.user.id);
+        const detectedRole=(profile&&profile.role)||authData.user.role||'user';
         if(!profile){
-            await upsertUserProfile({id:authData.user.id,email,username:input,name:input,role:'user',storage_limit:0,force_change_password:false});
-            currentUser={id:authData.user.id,email,username:input,name:input,role:'user',storage_limit:0,force_change_password:false};
+            await upsertUserProfile({id:authData.user.id,email,username:input,name:authData.user.name||input,role:detectedRole,storage_limit:500,force_change_password:false});
+            currentUser={id:authData.user.id,email,username:input,name:authData.user.name||input,role:detectedRole,storage_limit:500,force_change_password:false};
         }else{
-            currentUser={id:profile.id,email:profile.email||email,username:profile.username||input,name:profile.name,role:profile.role,storage_limit:profile.storage_limit||0,force_change_password:profile.force_change_password};
+            currentUser={id:profile.id,email:profile.email||email,username:profile.username||input,name:profile.name,role:detectedRole,storage_limit:profile.storage_limit||0,force_change_password:profile.force_change_password};
         }
         LS.set('currentUser',currentUser);
         if(currentUser.force_change_password){showChangePasswordModal();return}
         onLoginSuccess();
-    }catch(e){toast('Login gagal: '+e.message)}
+    }catch(e){toast('Login gagal: '+(e.message||e))}
 }
 window.doLogin=doLogin;
 
@@ -186,7 +276,7 @@ async function logout(){
     try{bcStopAdminRealtime()}catch(e){}
     try{hsStopHostSession()}catch(e){}
     currentUser=null;LS.del('currentUser');
-    if(isSupabaseConfigured())await authSignOut();
+    if(isNeonConfigured())await authSignOut();
     $('appPage').style.display='none';
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     $('loginPage').style.display='';
@@ -210,18 +300,46 @@ function updateUI(){
 // ========== DATA SYNC ==========
 async function syncData(){
     if(!currentUser)return;
-    if(isSupabaseConfigured()){
+    if(isNeonConfigured()){
         try{
-            const sb=getSupabase();
+            const sb=getNeonClient();
             const uid=currentUser.id;
             const [t,p,u,s]=await Promise.all([
-                sb.from('tracks').select('*').or(`owner.eq.${uid},type.eq.gdrive`),
+                sb.from('tracks').select('*').or(`owner.eq.${uid},owner.eq.shared,type.eq.gdrive`),
                 sb.from('playlists').select('*').eq('owner',uid),
                 sb.from('upacaras').select('*').eq('owner',uid),
                 sb.from('schedules').select('*').eq('owner',uid)
             ]);
             tracks=t.data||[];playlists=p.data||[];upacaras=u.data||[];schedules=s.data||[];
-        }catch(e){console.error('Sync error:',e)}
+            if((!tracks||tracks.length===0)&&neonSql){
+                try{
+                    const [ft,fp,fu,fs_rows]=await Promise.all([
+                        neonSql`SELECT * FROM tracks WHERE owner = ${uid} OR owner = 'shared' OR type = 'gdrive'`,
+                        neonSql`SELECT * FROM playlists WHERE owner = ${uid}`,
+                        neonSql`SELECT * FROM upacaras WHERE owner = ${uid}`,
+                        neonSql`SELECT * FROM schedules WHERE owner = ${uid}`
+                    ]);
+                    if(ft&&ft.length) tracks=ft;
+                    if(fp&&fp.length) playlists=fp;
+                    if(fu&&fu.length) upacaras=fu;
+                    if(fs_rows&&fs_rows.length) schedules=fs_rows;
+                }catch(err){console.warn('Fallback syncData neonSql failed:',err)}
+            }
+        }catch(e){
+            console.error('Sync error:',e);
+            if(neonSql){
+                try{
+                    const uid=currentUser.id;
+                    const [ft,fp,fu,fs_rows]=await Promise.all([
+                        neonSql`SELECT * FROM tracks WHERE owner = ${uid} OR type = 'gdrive'`,
+                        neonSql`SELECT * FROM playlists WHERE owner = ${uid}`,
+                        neonSql`SELECT * FROM upacaras WHERE owner = ${uid}`,
+                        neonSql`SELECT * FROM schedules WHERE owner = ${uid}`
+                    ]);
+                    tracks=ft||[];playlists=fp||[];upacaras=fu||[];schedules=fs_rows||[];
+                }catch(err){}
+            }
+        }
         // Pengaturan dimuat TERPISAH agar tetap ter-load walau salah satu tabel error
         try{
             const dbSettings=await loadUserSettings(currentUser.id);
@@ -264,6 +382,8 @@ async function syncData(){
                 else{t._localAvailable=false}
             }
         }
+        try{ migrateAdzanSettings(); }catch(e){}
+        populateAdzanSelectors();
         await updateAdzanAvailability();
         ensureTrackDurations();
     }else{
@@ -285,7 +405,7 @@ let _saveTimer=null;
 function saveLocal(){
     if(!currentUser)return;
     LS.set('settings_'+currentUser.id,settings);
-    if(isSupabaseConfigured()){
+    if(isNeonConfigured()){
         if(_saveTimer)clearTimeout(_saveTimer);
         _saveTimer=setTimeout(async()=>{
             await Promise.allSettled([saveUserSettingsNow(), saveSiteLocationNow(), syncAllToSupabase()]);
@@ -314,7 +434,7 @@ function refreshLocationDisplays(){
 // Simpan pengaturan user ke database SEKARANG (tanpa debounce), hasilnya true/false.
 // Read-modify-write agar tidak menimpa pengaturan yang baru di-save dari device lain.
 async function saveUserSettingsNow(){
-    if(!currentUser||!isSupabaseConfigured())return true;
+    if(!currentUser||!isNeonConfigured())return true;
     if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null}
     try{
         let toSave=settings;
@@ -328,7 +448,7 @@ async function saveUserSettingsNow(){
     }catch(e){console.error('Settings sync error:',e);return false}
 }
 async function saveSiteLocationNow(){
-    if(!isSupabaseConfigured())return true;
+    if(!isNeonConfigured())return true;
     try{
         const ok=await saveSiteConfig({ lat:settings.lat, lng:settings.lng, time_offset:settings.timeOffset, prayer_offsets:settings.prayerOffsets, updated_by: currentUser?.id||null });
         if(!ok){ console.warn('Site config sync gagal'); toast('Gagal simpan lokasi global — cek sql/site_config.sql & RLS'); }
@@ -339,9 +459,9 @@ async function saveSiteLocationNow(){
 // Sinkronkan penuh: semua data milik user ini (tracks/playlists/upacaras/schedules)
 // di-upsert ke database + hapus baris DB yang tidak lagi ada di lokal.
 async function syncAllToSupabase(){
-    if(!currentUser||!isSupabaseConfigured())return;
+    if(!currentUser||!isNeonConfigured())return;
     try{
-        const sb=getSupabase();
+        const sb=getNeonClient();
         const uid=currentUser.id;
         const owned=id=>!id||id===uid;
         const mkTracks=tracks.filter(t=>owned(t.owner)).map(t=>({id:t.id,name:t.name,type:t.type,src:t.type==='offline'?'':(t.src||''),duration:t.duration||0,size:t.size||'',volume:typeof t.volume==='number'?t.volume:100,media_kind:mediaKindOf(t),owner:uid}));
@@ -417,7 +537,7 @@ async function saveSholatSettings(btn){
     if(allOk){
         if(lbl)lbl.textContent='✓ Tersimpan';
         setTimeout(()=>{if(btn.isConnected&&lbl)lbl.textContent=old},2000);
-        if(st){st.classList.remove('hidden');st.style.color='#16a34a';st.textContent=(isSupabaseConfigured()?'Tersimpan ke database • ':'Tersimpan di perangkat ini • ')+new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+        if(st){st.classList.remove('hidden');st.style.color='#16a34a';st.textContent=(isNeonConfigured()?'Tersimpan ke database • ':'Tersimpan di perangkat ini • ')+new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
         toast('Pengaturan jadwal sholat tersimpan — lokasi berlaku untuk semua device');
     }else if(dbOk){
         if(lbl)lbl.textContent='✓ Tersimpan (lokasi global gagal)';
@@ -464,7 +584,13 @@ function populateAdzanSelectors(){
     const legacyMap=[['adzanSubuhTrack',settings.adzanSubuhTrackId],['adzanUmumTrack',settings.adzanUmumTrackId],['doaTrack',settings.doaTrackId]];
     for(const[id,sel]of legacyMap){const el=$(id);if(!el)continue;el.innerHTML=opts;if(sel)el.value=sel;}
     // doa track
-    const doaEl=$('doaTrack'); if(doaEl){ doaEl.innerHTML=opts; if(settings.doaTrackId) doaEl.value=settings.doaTrackId; }
+    const doaEl=$('doaTrack');
+    if(doaEl){
+        const selDoa=getAdzanTrackId('doa');
+        doaEl.innerHTML=opts;
+        if(selDoa) doaEl.value=selDoa;
+    }
+    updateAdzanStatus();
 }
 function toggleShuffle(){settings.shuffle=!settings.shuffle;updateShuffleRepeatBtn();saveLocal()}
 window.toggleShuffle=toggleShuffle;
@@ -491,7 +617,12 @@ function showPage(page){
     if(page==='upacara'){try{activeUpacaraId=null;}catch{}renderUpacaras();}
     if(page==='jadwal')renderSchedules();
     if(page==='broadcast'){populateBcSelectors();bcEnsureAdminRealtime();renderBcAdzanBtn();}
-    if(page==='sholat')renderPrayerGrid();
+    if(page==='sholat'){
+        try{ migrateAdzanSettings(); }catch(e){}
+        populateAdzanSelectors();
+        renderPrayerGrid();
+        updateAdzanStatus();
+    }
     if(page==='admin')renderAdmin();
     if(page==='dashboard'){ renderDashboard(); refreshLocationDisplays(); }
     toggleMobileMenu(false); // tutup drawer di mobile setelah pindah halaman
@@ -536,30 +667,304 @@ function updateClock(){
     }
 }
 
-// ========== PRAYER TIMES ==========
-function calcPrayerTimes(lat,lng){
-    const off=settings.timeOffset||0;
-    const po=settings.prayerOffsets||{};
-    const base={Imsak:[4,35],Subuh:[4,45],Terbit:[6,5],Dzuhur:[11,55],Ashar:[15,10],Maghrib:[17,55],Isya:[19,10]};
-    const lo=(lng-106.8456)/15,la=(lat+6.2088)*2;
-    const t={};
-    for(const[n,[h,m]]of Object.entries(base)){
-        let v=h*60+m+lo*60+la+off+(po[n]||0);if(n==='Imsak')v-=10;if(n==='Terbit')v+=10;
-        t[n]=`${(Math.floor(v/60)+24)%24}`.padStart(2,'0')+':'+`${Math.floor(v%60)}`.padStart(2,'0');
+// ========== PRAYER TIMES (Aladhan API Method 20 - Kemenag RI + Astronomical Fallback) ==========
+let _apiPrayerCache = {};
+let _lastPrayerFetchDate = '';
+let _prayerApiStatus = 'Menghitung astronomis Kemenag...';
+
+function toRad(deg){return (deg * Math.PI)/180;}
+function toDeg(rad){return (rad * 180)/Math.PI;}
+
+function calcPrayTimesAstronomical(date, lat, lng, timezone){
+    if(typeof timezone !== 'number'){
+        timezone = lng < 110 ? 7 : (lng < 120 ? 8 : 9); // WIB = 7, WITA = 8, WIT = 9
+    }
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+
+    let Y = year, M = month, D = day;
+    if(M <= 2){ Y -= 1; M += 12; }
+    const A = Math.floor(Y / 100);
+    const B = 2 - A + Math.floor(A / 4);
+    const JD = Math.floor(365.25 * (Y + 4716)) + Math.floor(30.6001 * (M + 1)) + D + B - 1524.5;
+
+    const d = JD - 2451545.0;
+    const g = (357.529 + 0.98560028 * d) % 360;
+    const q = (280.459 + 0.98564736 * d) % 360;
+    const L = (q + 1.915 * Math.sin(toRad(g)) + 0.020 * Math.sin(toRad(2 * g))) % 360;
+    const e = 23.439 - 0.00000036 * d;
+
+    let RA = toDeg(Math.atan2(Math.cos(toRad(e)) * Math.sin(toRad(L)), Math.cos(toRad(L)))) / 15;
+    if(RA < 0) RA += 24;
+    const decl = toDeg(Math.asin(Math.sin(toRad(e)) * Math.sin(toRad(L))));
+    const EqT = q / 15 - RA;
+
+    const noon = 12 + timezone - lng / 15 - EqT;
+
+    function sunAngleTime(angle, direction){
+        const val = (Math.sin(toRad(angle)) - Math.sin(toRad(lat)) * Math.sin(toRad(decl))) /
+                    (Math.cos(toRad(lat)) * Math.cos(toRad(decl)));
+        if(val > 1 || val < -1) return null;
+        const hourAngle = toDeg(Math.acos(val)) / 15;
+        return direction === 'ccw' ? noon - hourAngle : noon + hourAngle;
+    }
+
+    function asrTime(){
+        const alt = toDeg(Math.atan(1 / (1 + Math.tan(toRad(Math.abs(lat - decl))))));
+        return sunAngleTime(alt, 'cw');
+    }
+
+    // Parameter Resmi Kemenag RI:
+    // Subuh: -20 derajat
+    // Isya: -18 derajat
+    // Terbit/Maghrib: -0.833 derajat (refraksi matahari terbit/terbenam)
+    const fajrHours = sunAngleTime(-20, 'ccw');
+    const sunriseHours = sunAngleTime(-0.833, 'ccw');
+    const dhuhrHours = noon;
+    const asrHours = asrTime();
+    const maghribHours = sunAngleTime(-0.833, 'cw');
+    const ishaHours = sunAngleTime(-18, 'cw');
+
+    function fmt(hours){
+        if(hours == null) return '--:--';
+        const totalMin = Math.round(hours * 60);
+        const h = (Math.floor(totalMin / 60) + 24) % 24;
+        const m = (totalMin % 60 + 60) % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    const imsakMin = Math.round(fajrHours * 60) - 10;
+    const imsakH = (Math.floor(imsakMin / 60) + 24) % 24;
+    const imsakM = (imsakMin % 60 + 60) % 60;
+
+    return {
+        Imsak: `${String(imsakH).padStart(2, '0')}:${String(imsakM).padStart(2, '0')}`,
+        Subuh: fmt(fajrHours),
+        Terbit: fmt(sunriseHours),
+        Dzuhur: fmt(dhuhrHours),
+        Ashar: fmt(asrHours),
+        Maghrib: fmt(maghribHours),
+        Isya: fmt(ishaHours)
+    };
+}
+
+// Fetch official Aladhan API (Method 20: Kemenag RI) dengan auto cache harian
+async function fetchOfficialPrayerTimes(lat, lng, force = false){
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const cacheKey = `mp_aladhan_${Number(lat).toFixed(3)}_${Number(lng).toFixed(3)}_${today}`;
+    if(!force){
+        const cached = LS.get(cacheKey, null);
+        if(cached && cached.Subuh){
+            _apiPrayerCache = cached;
+            _prayerApiStatus = 'Kemenag RI (Aladhan Cache)';
+            return cached;
+        }
+    }
+    try{
+        const ts = Math.floor(now.getTime() / 1000);
+        const res = await fetch(`https://api.aladhan.com/v1/timings/${ts}?latitude=${lat}&longitude=${lng}&method=20`);
+        const json = await res.json();
+        if(json?.data?.timings){
+            const raw = json.data.timings;
+            const clean = (t) => t ? t.split(' ')[0].slice(0, 5) : null;
+            const mapped = {
+                Imsak: clean(raw.Imsak),
+                Subuh: clean(raw.Fajr),
+                Terbit: clean(raw.Sunrise),
+                Dzuhur: clean(raw.Dhuhr),
+                Ashar: clean(raw.Asr),
+                Maghrib: clean(raw.Maghrib),
+                Isya: clean(raw.Isha),
+            };
+            if(mapped.Subuh && mapped.Dzuhur){
+                _apiPrayerCache = mapped;
+                _prayerApiStatus = 'Kemenag RI (Aladhan API Terverifikasi)';
+                LS.set(cacheKey, mapped);
+                prayerTimes = calcPrayerTimes(lat, lng);
+                renderPrayerGrid();
+                const ls = $('locationStatus');
+                if(ls && !ls.textContent.includes('Kemenag')) {
+                    ls.textContent += ' • 🕌 Standar Kemenag RI (Aladhan API)';
+                }
+                return mapped;
+            }
+        }
+    }catch(e){
+        console.warn('Aladhan API fetch failed, using accurate astronomical calculation:', e);
+        _prayerApiStatus = 'Kemenag RI (Astronomis Akurat)';
+    }
+    return null;
+}
+window.fetchOfficialPrayerTimes = fetchOfficialPrayerTimes;
+
+function calcPrayerTimes(lat, lng){
+    const off = settings.timeOffset || 0;
+    const po = settings.prayerOffsets || {};
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+
+    if(_lastPrayerFetchDate !== today){
+        _lastPrayerFetchDate = today;
+        fetchOfficialPrayerTimes(lat, lng);
+    }
+
+    let base = null;
+    const cacheKey = `mp_aladhan_${Number(lat).toFixed(3)}_${Number(lng).toFixed(3)}_${today}`;
+    const cached = (_apiPrayerCache && _apiPrayerCache.Subuh) ? _apiPrayerCache : LS.get(cacheKey, null);
+    if(cached && cached.Subuh){
+        base = cached;
+    } else {
+        base = calcPrayTimesAstronomical(now, lat, lng);
+    }
+
+    const t = {};
+    for(const n of PRAYER_NAMES){
+        const timeStr = base[n];
+        if(!timeStr) continue;
+        const [h, m] = timeStr.split(':').map(Number);
+        let totalMin = h * 60 + m + off + (po[n] || 0);
+        const finalH = (Math.floor(totalMin / 60) + 24) % 24;
+        const finalM = (totalMin % 60 + 60) % 60;
+        t[n] = `${String(finalH).padStart(2, '0')}:${String(finalM).padStart(2, '0')}`;
     }
     return t;
 }
+function getIndonesianDateAndHijri(){
+    const now=new Date();
+    const dayNames=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+    const monthNames=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+    const dStr=`${dayNames[now.getDay()]}, ${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+    const h=gregorianToHijri(now.getFullYear(),now.getMonth()+1,now.getDate());
+    const hijriMonths=['Muharram','Safar','Rabiul Awwal','Rabiul Akhir','Jumadil Ula','Jumadil Akhir','Rajab',"Sya'ban",'Ramadhan','Syawal',"Dzulqa'dah",'Dzulhijjah'];
+    const hStr=`${h.day} ${hijriMonths[h.month-1]||''} ${h.year} H`;
+    return `${dStr} • ${hStr}`;
+}
+
 function renderPrayerGrid(){
     prayerTimes=calcPrayerTimes(settings.lat,settings.lng);
     const now=new Date(),nm=now.getHours()*60+now.getMinutes();
     let nextP=null,nextM=Infinity;
-    for(const[n,time]of Object.entries(prayerTimes)){const[hh,mm]=time.split(':').map(Number);const p=hh*60+mm;if(p>nm&&p<nextM){nextM=p;nextP=n}}
+    for(const[n,time]of Object.entries(prayerTimes)){
+        const[hh,mm]=time.split(':').map(Number);
+        const p=hh*60+mm;
+        if(p>nm&&p<nextM){nextM=p;nextP=n}
+    }
     if(!nextP)nextP='Subuh';
-    $('prayerGrid').innerHTML=PRAYER_NAMES.map(n=>{
-        const ov=(settings.prayerOffsets||{})[n]||0;
-        const sign=ov>0?'+':'';
-        return`<div class="glass-card rounded-lg p-2 text-center prayer-card ${n===nextP?'next':''}"><p class="text-[10px] text-on-surface-variant">${n}</p><p class="text-sm font-bold prayer-time">${prayerTimes[n]||'--:--'}</p><div class="flex items-center justify-center gap-1 mt-1"><button class="w-5 h-5 rounded bg-gray-100 flex items-center justify-center hover:bg-gray-200 text-[10px] font-bold" onclick="adjustPrayerOffset('${n}',-1)">-</button><span class="text-[10px] w-6 text-on-surface-variant">${sign}${ov}</span><button class="w-5 h-5 rounded bg-gray-100 flex items-center justify-center hover:bg-gray-200 text-[10px] font-bold" onclick="adjustPrayerOffset('${n}',1)">+</button></div></div>`;
-    }).join('');
+
+    // Update Date & Hijri Badge
+    const dtEl=$('sholatDateText');
+    if(dtEl) dtEl.textContent=getIndonesianDateAndHijri();
+
+    // Icons & descriptions map
+    const meta={
+        Imsak: {
+            icon: '<span class="text-slate-400 text-[10px]">Peringatan</span>',
+            sub: '10 mnt sblm subuh'
+        },
+        Subuh: {
+            icon: '<svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+            sub: 'Pagi hari'
+        },
+        Terbit: {
+            icon: '<svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3v2m0 14v2m9-9h-2M5 12H3m14.828-5.828l-1.414 1.414M6.586 16.414l-1.414 1.414M17.414 17.414l-1.414-1.414M6.586 6.586L5.172 5.172" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+            sub: 'Dilarang sholat'
+        },
+        Dzuhur: {
+            icon: '<svg class="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"></path></svg>',
+            sub: 'Siang hari'
+        },
+        Ashar: {
+            icon: '<svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+            sub: 'Sore hari'
+        },
+        Maghrib: {
+            icon: '<svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+            sub: 'Petang / Berbuka'
+        },
+        Isya: {
+            icon: '<svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" stroke-linecap="round" stroke-linejoin="round"></path></svg>',
+            sub: 'Malam hari'
+        }
+    };
+
+    if($('prayerGrid')){
+        $('prayerGrid').innerHTML=PRAYER_NAMES.map(n=>{
+            const ov=(settings.prayerOffsets||{})[n]||0;
+            const sign=ov>0?'+':'';
+            const isNext=(n===nextP);
+            const mInfo=meta[n]||{icon:'',sub:''};
+            let subText=mInfo.sub;
+            if(isNext&&nextM!==Infinity){
+                const diff=nextM-nm;
+                subText=diff>0?`Dalam ${diff} menit`:'Sekarang';
+            }
+
+            if(isNext){
+                return `<div class="bg-gradient-to-b from-emerald-50/90 to-white rounded-xl border-2 border-emerald-500 p-3.5 flex flex-col justify-between shadow-sm relative prayer-card next">
+                    <div class="absolute -top-2.5 right-3 bg-emerald-600 text-white font-bold text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full shadow-xs">
+                        Selanjutnya
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-emerald-800">${n}</span>
+                        ${mInfo.icon}
+                    </div>
+                    <div class="my-3 text-center">
+                        <div class="text-2xl font-black tracking-tight text-emerald-700 font-mono prayer-time">${prayerTimes[n]||'--:--'}</div>
+                        <span class="text-[10px] text-emerald-600 font-medium">${subText}</span>
+                    </div>
+                    <div class="flex items-center justify-between bg-white border border-emerald-200 rounded-lg p-1 text-xs">
+                        <button class="w-6 h-6 flex items-center justify-center rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold transition shadow-xs" onclick="adjustPrayerOffset('${n}',-1)">-</button>
+                        <span class="font-mono text-xs font-bold text-emerald-800">${sign}${ov}</span>
+                        <button class="w-6 h-6 flex items-center justify-center rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold transition shadow-xs" onclick="adjustPrayerOffset('${n}',1)">+</button>
+                    </div>
+                </div>`;
+            }
+
+            return `<div class="bg-white rounded-xl border border-slate-200 p-3.5 flex flex-col justify-between hover:border-slate-300 transition shadow-2xs prayer-card">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-700">${n}</span>
+                    ${mInfo.icon}
+                </div>
+                <div class="my-3 text-center">
+                    <div class="text-2xl font-black tracking-tight text-slate-800 font-mono prayer-time">${prayerTimes[n]||'--:--'}</div>
+                    <span class="text-[10px] text-slate-400">${subText}</span>
+                </div>
+                <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-1 text-xs">
+                    <button class="w-6 h-6 flex items-center justify-center rounded bg-white hover:bg-slate-200 text-slate-600 font-bold transition shadow-xs" onclick="adjustPrayerOffset('${n}',-1)">-</button>
+                    <span class="font-mono text-xs font-semibold text-slate-700">${sign}${ov}</span>
+                    <button class="w-6 h-6 flex items-center justify-center rounded bg-white hover:bg-slate-200 text-slate-600 font-bold transition shadow-xs" onclick="adjustPrayerOffset('${n}',1)">+</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // Update prayer times in Audio Adzan rows
+    for (const p of ADZAN_PRAYERS) {
+        const el = $('adzanTime_' + p);
+        if (el) el.textContent = (prayerTimes[p] || '--:--') + ' WIB';
+    }
+
+    // Update Adzan Ready Badge
+    const badge = $('adzanReadyBadge');
+    if (badge) {
+        const readyCount = ADZAN_PRAYERS.filter(p => {
+            const tid = getAdzanTrackIdForPrayer(p);
+            return (tid && tracks.some(t => t.id === tid)) || !!findAutoMatchAdzanTrack(p);
+        }).length;
+        if (readyCount === 5) {
+            badge.className = 'inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800';
+            badge.textContent = '5 Audio Terpilih Siap';
+        } else if (readyCount > 0) {
+            badge.className = 'inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800';
+            badge.textContent = readyCount + '/5 Audio Siap';
+        } else {
+            badge.className = 'inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-600';
+            badge.textContent = 'Belum Ada Audio';
+        }
+    }
+
     const c=$('dashPrayerTimes');if(!c)return;
     c.innerHTML=PRAYER_NAMES.filter(n=>n!=='Imsak'&&n!=='Terbit').map(n=>{
         const isNext=n===nextP;
@@ -573,6 +978,71 @@ function adjustPrayerOffset(name,delta){
     saveLocal();renderPrayerGrid();
 }
 window.adjustPrayerOffset=adjustPrayerOffset;
+
+function resetSholatOffsets(){
+    if(!confirm('Kembalikan koreksi waktu sholat ke default (0 menit)?')) return;
+    settings.prayerOffsets = { Imsak:0, Subuh:0, Terbit:0, Dzuhur:0, Ashar:0, Maghrib:0, Isya:0 };
+    saveLocal();
+    renderPrayerGrid();
+    toast('Koreksi waktu sholat dikembalikan ke 0');
+}
+window.resetSholatOffsets = resetSholatOffsets;
+
+function openCityPicker(){
+    const cities = [
+        { name: 'Jakarta (DKI)', lat: -6.2088, lng: 106.8456 },
+        { name: 'Bogor (Kota/Kab)', lat: -6.5950, lng: 106.8166 },
+        { name: 'Depok (Jawa Barat)', lat: -6.4025, lng: 106.7942 },
+        { name: 'Tangerang (Banten)', lat: -6.1783, lng: 106.6319 },
+        { name: 'Bekasi (Jawa Barat)', lat: -6.2383, lng: 106.9756 },
+        { name: 'Bandung (Jawa Barat)', lat: -6.9175, lng: 107.6191 },
+        { name: 'Semarang (Jawa Tengah)', lat: -6.9667, lng: 110.4167 },
+        { name: 'Yogyakarta (DIY)', lat: -7.7956, lng: 110.3695 },
+        { name: 'Surabaya (Jawa Timur)', lat: -7.2575, lng: 112.7521 },
+        { name: 'Medan (Sumatera Utara)', lat: 3.5952, lng: 98.6722 },
+        { name: 'Palembang (Sumatera Selatan)', lat: -2.9761, lng: 104.7754 },
+        { name: 'Makassar (Sulawesi Selatan)', lat: -5.1477, lng: 119.4327 },
+        { name: 'Denpasar (Bali)', lat: -8.6705, lng: 115.2126 },
+        { name: 'Banjarmasin (Kalimantan Selatan)', lat: -3.3194, lng: 114.5908 },
+        { name: 'Balikpapan (Kalimantan Timur)', lat: -1.2379, lng: 116.8529 },
+    ];
+    const opts = cities.map((c, i) => `${i+1}. ${c.name}`).join('\n');
+    const input = prompt('Pilih nomor kota untuk koordinat otomatis:\n' + opts);
+    if(!input) return;
+    const idx = parseInt(input) - 1;
+    if(idx >= 0 && idx < cities.length){
+        const c = cities[idx];
+        settings.lat = c.lat;
+        settings.lng = c.lng;
+        if($('latInput')) $('latInput').value = c.lat;
+        if($('lngInput')) $('lngInput').value = c.lng;
+        try { LS.set('locationName', c.name); LS.set('site_loc_name', c.name); } catch(e){}
+        prayerTimes = calcPrayerTimes(settings.lat, settings.lng);
+        saveLocal();
+        saveSiteLocationNow();
+        saveUserSettingsNow();
+        renderPrayerGrid();
+        refreshLocationDisplays();
+        toast('Lokasi diatur ke: ' + c.name);
+    } else {
+        toast('Pilihan nomor tidak valid');
+    }
+}
+window.openCityPicker = openCityPicker;
+
+function onManualLocationChange(){
+    const lat = parseFloat($('latInput')?.value);
+    const lng = parseFloat($('lngInput')?.value);
+    if(!isNaN(lat) && !isNaN(lng)){
+        settings.lat = lat;
+        settings.lng = lng;
+        prayerTimes = calcPrayerTimes(lat, lng);
+        saveLocal();
+        renderPrayerGrid();
+        refreshLocationDisplays();
+    }
+}
+window.onManualLocationChange = onManualLocationChange;
 function updateCountdown(now){
     const nowSec=now.getHours()*3600+now.getMinutes()*60+now.getSeconds();
     let nextSec=Infinity,nextN='';
@@ -609,7 +1079,15 @@ const getAdzanKind=t=>{
 };
 const getAdzanTrackId=k=>{
     if(['Subuh','Dzuhur','Ashar','Maghrib','Isya'].includes(k)) return getAdzanTrackIdForPrayer(k);
-    if(k==='doa') return settings.doaTrackId;
+    if(k==='doa'){
+        if(settings.doaTrackId){
+            const exists = tracks.length ? tracks.some(t => t.id === settings.doaTrackId) : true;
+            if(exists) return settings.doaTrackId;
+        }
+        const auto = findAutoMatchAdzanTrack('doa');
+        if(auto) return auto.id;
+        return null;
+    }
     if(k==='subuh') return getAdzanTrackIdForPrayer('Subuh');
     if(k==='umum') return getAdzanTrackIdForPrayer('Dzuhur');
     return null;
@@ -627,14 +1105,16 @@ async function updateAdzanAvailability(){try{await cleanupLegacyAdzanAudio()}cat
 // status: 'none' = belum diatur | 'ok' = siap diputar | 'localMissing' = judul ada tapi file tidak ada di perangkat ini
 async function resolveAdzan(kind){
     const id=getAdzanTrackId(kind);
-    if(id){
-        let t=tracks.find(x=>x.id===id);
-        if(!t&&isSupabaseConfigured()){try{t=(await getSupabase().from('tracks').select('*').eq('id',id).single()).data}catch(e){}}
-        if(t){
-            if((t.type==='online'||t.type==='gdrive')&&t.src)return{src:t.src,status:'ok'};
-            let b=null;try{b=await getBlob(id)}catch(e){}
-            return b?{src:URL.createObjectURL(b),status:'ok'}:{src:null,status:'localMissing'};
-        }
+    let t=id?tracks.find(x=>x.id===id):null;
+    if(!t&&id&&isNeonConfigured()){try{t=(await getNeonClient().from('tracks').select('*').eq('id',id).single()).data}catch(e){}}
+    if(!t){
+        const auto=findAutoMatchAdzanTrack(kind);
+        if(auto) t=auto;
+    }
+    if(t){
+        if((t.type==='online'||t.type==='gdrive')&&t.src)return{src:normalizeGdrive(t.src),status:'ok',track:t};
+        let b=null;try{b=await getBlob(t.id)}catch(e){}
+        return b?{src:URL.createObjectURL(b),status:'ok',track:t}:{src:null,status:'localMissing',track:t};
     }
     return{src:null,status:'none'};
 }
@@ -668,10 +1148,10 @@ function updateAdzanStatus(){
     const rows=[...ADZAN_PRAYERS.map(p=>[p,'Adzan '+p]), ['doa','Doa']];
     s.innerHTML=rows.map(([k,label])=>{
         const id=getAdzanTrackId(k);
-        if(!id)return '<span style="color:#94a3b8">'+label+': belum dipilih dari library</span>';
-        const t=tracks.find(x=>x.id===id);
+        let t=id?tracks.find(x=>x.id===id):null;
+        if(!t) t=findAutoMatchAdzanTrack(k);
         if(!t) return '<span style="color:#94a3b8">'+label+': belum dipilih dari library</span>';
-        if(t.type!=='online'&&t.type!=='gdrive'&&t._localAvailable===false) return '<span style="color:#ef4444">'+label+': '+t.name+' &mdash; file lokal tidak tersedia di perangkat ini</span>';
+        if(t.type!=='online'&&t.type!=='gdrive'&&t._localAvailable===false) return '<span style="color:#ef4444">'+label+': '+t.name+' — file lokal tidak tersedia di perangkat ini</span>';
         const vol=k==='doa'?settings.doaVolume:getAdzanVolumeForPrayer(k);
         const tag=t.type==='online'?' (Online)':t.type==='gdrive'?' (GDrive)':'';
         return '<span style="color:#16a34a">'+label+': '+t.name+tag+' • '+vol+'%</span>';
@@ -679,18 +1159,39 @@ function updateAdzanStatus(){
 }
 let _previewAudio=null;
 async function previewAdzan(type){
-    if(_previewAudio){_previewAudio.pause();_previewAudio=null;toast('Stop preview');return}
+    if(_previewAudio){
+        _previewAudio.pause();
+        _previewAudio=null;
+        toast('Stop preview');
+        return;
+    }
     const kind=getAdzanKind(type);
     let vol=0.8;
     if(kind==='doa') vol=settings.doaVolume/100;
     else if(['Subuh','Dzuhur','Ashar','Maghrib','Isya'].includes(kind)) vol=getAdzanVolumeForPrayer(kind)/100;
     else if(kind==='Subuh') vol=getAdzanVolumeForPrayer('Subuh')/100;
     else vol=getAdzanVolumeForPrayer('Dzuhur')/100;
+
     const r=await resolveAdzan(kind);
-    if(r.status==='none'){toast('Belum ada file / belum pilih dari library');return}
-    if(!r.src){toast('File lokal tidak tersedia');updateAdzanStatus();return}
-    _previewAudio=new Audio(r.src);_previewAudio.volume=vol;_previewAudio.play();toast('Preview '+kind+' (klik Test lagi untuk stop)');
-    _previewAudio.onended=()=>{_previewAudio=null};
+    if(r.status==='none'||!r.src){
+        toast('Audio '+(kind==='doa'?'Doa':'Adzan '+kind)+' belum ada di Library atau belum dipilih');
+        updateAdzanStatus();
+        return;
+    }
+    try{
+        if(audio&&isPlaying) audio.pause();
+        _previewAudio=new Audio(r.src);
+        _previewAudio.volume=vol;
+        _previewAudio.onended=()=>{_previewAudio=null};
+        _previewAudio.onerror=(err)=>{console.error('Audio preview error:',err);toast('Gagal memutar file audio');_previewAudio=null};
+        await _previewAudio.play();
+        const tName=r.track?r.track.name:kind;
+        toast('▶ Memutar preview '+tName+' (klik Test lagi untuk stop)');
+    }catch(err){
+        console.error('previewAdzan play catch:',err);
+        toast('Gagal memutar audio: '+(err.message||'Format tidak didukung'));
+        _previewAudio=null;
+    }
 }
 window.previewAdzan=previewAdzan;
 
@@ -746,7 +1247,7 @@ function playAdzanForPrayer(name){
             resolveAdzanSrc('doa').then(ds=>{
                 if(!ds)return;
                 setTimeout(()=>{
-                    const d=new Audio(ds);d.volume=settings.doaVolume/100;
+                    const d=new Audio(ds); d.volume=settings.doaVolume/100;
                     d.play().catch(()=>{});toast('Doa setelah adzan');
                 },2000);
             });
@@ -782,7 +1283,7 @@ window.switchLibMedia=switchLibMedia;
 // ========== SUPABASE UPLOAD ==========
 async function uploadToSupabase(input){
     const f=input.files[0];if(!f)return;
-    if(!isSupabaseConfigured()){toast('Supabase belum dikonfigurasi');return}
+    if(!isNeonConfigured()){toast('Supabase belum dikonfigurasi');return}
     if((f.type||'').startsWith('video')){toast('Video tidak bisa diupload ke Supabase — gunakan Offline, GDrive, atau URL video');input.value='';return}
     
     // Cek storage limit user
@@ -796,7 +1297,7 @@ async function uploadToSupabase(input){
     }
     
     $('supabaseStatus').textContent='Uploading...';
-    const sb=getSupabase();
+    const sb=getNeonClient();
     const path=`${currentUser.id}/${Date.now()}_${f.name}`;
     try{
         const {error}=await sb.storage.from('music').upload(path,f,{contentType:f.type});
@@ -811,46 +1312,94 @@ async function uploadToSupabase(input){
     input.value='';
 }
 window.uploadToSupabase=uploadToSupabase;
-function addOnlineTrack(){const url=$('onlineUrlInput').value.trim();const name=$('onlineNameInput').value.trim()||'Online Track';if(!url){toast('Masukkan URL');return}let kind='audio';const sel=$('onlineKindInput')?.value||'auto';if(sel==='video')kind='video';else if(sel==='audio')kind='audio';else kind=guessMediaKindFromName(name,url);const track={id:genId(),name,src:url,type:'online',duration:0,size:'Online',media_kind:kind,owner:currentUser.id};if(isSupabaseConfigured())getSupabase().from('tracks').upsert(track);tracks.unshift(track);saveLocal();renderTracks();$('onlineUrlInput').value='';$('onlineNameInput').value='';toast(kind==='video'?'Video ditambahkan ke Daftar Video':'Ditambahkan');ensureTrackDurations()}
+async function addOnlineTrack(){
+    let url=$('onlineUrlInput').value.trim();
+    let name=$('onlineNameInput').value.trim();
+    if(!url){toast('Masukkan URL');return}
+    
+    let type='online';
+    if(url.includes('drive.google.com')){
+        const gSrc=convertGDriveToDirect(url);
+        if(gSrc){
+            url=gSrc;
+            type='gdrive';
+            if(!name) name='Google Drive Track';
+        }
+    }
+    if(!name) name='Online Track';
+    
+    let kind='audio';
+    const sel=$('onlineKindInput')?.value||'auto';
+    if(sel==='video')kind='video';
+    else if(sel==='audio')kind='audio';
+    else kind=guessMediaKindFromName(name,url);
+    
+    const ownerId=currentUser?.id||'shared';
+    const track={id:genId(),name,src:url,type,duration:0,size:type==='gdrive'?'GDrive':'Online',media_kind:kind,owner:ownerId,volume:100};
+    
+    try{
+        await dbSaveTrack(track);
+    }catch(e){
+        console.warn('Online track db save failed:',e);
+    }
+    tracks.unshift(track);saveLocal();renderTracks();
+    $('onlineUrlInput').value='';$('onlineNameInput').value='';
+    toast(kind==='video'?'Video ditambahkan':'Musik ditambahkan');
+    ensureTrackDurations();
+}
 window.addOnlineTrack=addOnlineTrack;
-// ========== GOOGLE DRIVE (via Supabase Edge Function 'gdrive-proxy') ==========
-// Google memblokir pemutaran file GDrive langsung di tag <audio> (cross-origin).
-// Karena itu file diunduh dari sisi server lalu di-streaming lewat Edge Function:
-//   `${SUPABASE_URL}/functions/v1/gdrive-proxy?id=<FILE_ID>`
-const gdriveProxyBase=()=>{const u=(import.meta.env&&import.meta.env.VITE_SUPABASE_URL)||'';return u?u.replace(/\/$/,'')+'/functions/v1/gdrive-proxy':''};
-// Ekstrak FILE_ID dari sembarang link/URL Google Drive
+// ========== GOOGLE DRIVE ==========
+// Google Drive memblokir pemutaran langsung dari browser (403 / CORP same-site),
+// jadi file di-stream lewat proxy same-origin: /api/gdrive?id=<FILE_ID> (lihat server/gdrive-proxy.js).
 function extractGDriveId(link){
     if(!link)return'';
-    link=link.trim();
-    let id='';
-    let m=link.match(/\/file\/d\/([^/?#]+)/);
-    if(m)id=m[1];
-    if(!id){m=link.match(/[?&]id=([^&#]+)/);if(m)id=m[1]}
-    if(!id){m=link.match(/\/d\/([^/?#]+)/);if(m)id=m[1]}
-    return id;
+    link=String(link).trim();
+    if(!/drive\.google\.com|drive\.usercontent\.google\.com|^\/api\/gdrive/.test(link))return'';
+    const m=link.match(/\/file\/d\/([\w-]+)/)||link.match(/[?&]id=([\w-]+)/)||link.match(/\/d\/([\w-]+)/);
+    return m?m[1]:'';
 }
-function gdriveProxyUrl(id){
-    const base=gdriveProxyBase();
-    return base?(base+'?id='+encodeURIComponent(id)):'';
-}
-// Konversi link share Google Drive menjadi URL streaming (lewat Edge Function)
 function convertGDriveToDirect(link){
     const id=extractGDriveId(link);
-    if(!id)return'';
-    return gdriveProxyUrl(id);
+    return id?'/api/gdrive?id='+id:'';
 }
 window.convertGDriveToDirect=convertGDriveToDirect;
-// Normalisasi src gdrive LAWAS (yg masih tersimpan sbg URL drive.google.com/uc?export=download...)
-// menjadi URL proxy agar tetap bisa diputar setelah fitur ini diterapkan.
 function normalizeGdrive(src){
-    if(!src)return src;
-    if(src.indexOf('functions/v1/gdrive-proxy')>=0)return src;
-    const id=extractGDriveId(src);
-    if(!id)return src;
-    const p=gdriveProxyUrl(id);
-    return p||src;
+    return convertGDriveToDirect(src)||src;
 }
 window.normalizeGdrive=normalizeGdrive;
+
+// Helper simpan track ke database (Neon Client + Fallback neonSql)
+async function dbSaveTrack(track){
+    let saved=false;
+    if(isNeonConfigured()){
+        try{
+            const {error}=await getNeonClient().from('tracks').upsert(track);
+            if(!error) saved=true;
+        }catch(e){
+            console.warn('Track save via neonClient failed, fallback to neonSql:',e);
+        }
+    }
+    if(!saved && neonSql){
+        try{
+            await neonSql`
+                INSERT INTO tracks (id, name, src, type, duration, size, volume, owner, media_kind)
+                VALUES (${track.id}, ${track.name}, ${track.src}, ${track.type}, ${track.duration||0}, ${track.size||''}, ${track.volume||100}, ${track.owner}, ${track.media_kind||'audio'})
+                ON CONFLICT (id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    src = EXCLUDED.src,
+                    duration = EXCLUDED.duration,
+                    size = EXCLUDED.size,
+                    media_kind = EXCLUDED.media_kind
+            `;
+            saved=true;
+        }catch(err){
+            console.error('Track save via neonSql failed:',err);
+            throw err;
+        }
+    }
+    return saved;
+}
+
 // Tambah track dari Google Drive (dibagikan untuk SEMUA user & admin)
 async function addGDriveTrack(){
     const name=$('gdriveNameInput').value.trim();const link=$('gdriveLinkInput').value.trim();
@@ -859,25 +1408,21 @@ async function addGDriveTrack(){
     if(!link){toast('Masukkan link share Google Drive');return}
     const src=convertGDriveToDirect(link);
     if(!src){toast('Link Google Drive tidak valid');return}
-    if(!gdriveProxyBase()){toast('Supabase belum dikonfigurasi (proxy GDrive tidak tersedia)');return}
-    // Pemilik: admin -> 'shared' (dibagikan utk SEMUA user, TIDAK bisa dihapus user biasa);
-    // user biasa -> id user (hanya bisa dihapus oleh pemiliknya sendiri).
-    const gOwner=currentUser&&currentUser.role==='admin'?'shared':currentUser.id;
-    const track={id:genId(),name,src,type:'gdrive',duration:0,size:'GDrive',media_kind:kind,owner:gOwner};
-    // Simpan dahulu ke database agar tidak hilang saat refresh; baru tampilkan bila berhasil
-    if(isSupabaseConfigured()){
-        try{
-            const {error}=await getSupabase().from('tracks').upsert(track);
-            if(error)throw error;
-        }catch(e){
-            toast('Gagal simpan ke database: '+e.message);
-            console.error('GDrive save error:',e);
-            return;
-        }
+    
+    // Pemilik: admin -> 'shared' (dibagikan utk SEMUA user); user biasa -> id user.
+    const gOwner=(currentUser&&currentUser.role==='admin')?'shared':(currentUser?.id||'shared');
+    const track={id:genId(),name,src,type:'gdrive',duration:0,size:'GDrive',media_kind:kind,owner:gOwner,volume:100};
+    
+    try{
+        await dbSaveTrack(track);
+    }catch(e){
+        toast('Gagal simpan ke database: '+(e.message||e));
+        console.error('GDrive save error:',e);
+        return;
     }
     tracks.unshift(track);saveLocal();renderTracks();
     $('gdriveNameInput').value='';$('gdriveLinkInput').value='';
-    toast(kind==='video'?'Video Google Drive ditambahkan ke Daftar Video':'Lagu Google Drive ditambahkan');ensureTrackDurations();
+    toast(kind==='video'?'Video Google Drive ditambahkan':'Lagu Google Drive ditambahkan');ensureTrackDurations();
 }
 window.addGDriveTrack=addGDriveTrack;
 
@@ -897,7 +1442,7 @@ function handleFiles(files){
         const done=async(dur)=>{
             const track={id,name:f.name.replace(/\.[^/.]+$/,''),src:objUrl,type:'offline',duration:dur||0,size:formatSize(f.size),media_kind:kind,owner:currentUser.id,volume:100,_localAvailable:true};
             tracks.unshift(track);saveLocal();renderTracks();renderDashboard();toast(f.name+' ditambahkan ('+track.size+')'+(kind==='video'?' ke Daftar Video':''));
-            if(isSupabaseConfigured()){try{await getSupabase().from('tracks').upsert({id:track.id,name:track.name,src:'',type:'offline',duration:track.duration,size:track.size,media_kind:kind,owner:track.owner,volume:track.volume})}catch(e){console.error('Track sync:',e)}}
+            if(isNeonConfigured()){try{await getNeonClient().from('tracks').upsert({id:track.id,name:track.name,src:'',type:'offline',duration:track.duration,size:track.size,media_kind:kind,owner:track.owner,volume:track.volume})}catch(e){console.error('Track sync:',e)}}
         };
         if(isVid){
             const v=document.createElement('video');v.preload='metadata';v.muted=true;
@@ -950,7 +1495,7 @@ async function ensureTrackDurations(){
             const d=await measureAudioDuration(src);
             if(d>0){
                 t.duration=d;
-                if(isSupabaseConfigured()){try{await getSupabase().from('tracks').update({duration:d}).eq('id',t.id)}catch(e){}}
+                if(isNeonConfigured()){try{await getNeonClient().from('tracks').update({duration:d}).eq('id',t.id)}catch(e){}}
                 renderTracks();
                 const m=$('scheduleModal');if(m&&m.classList.contains('active'))updateScheduleDurationInfo();
             }
@@ -959,7 +1504,7 @@ async function ensureTrackDurations(){
 }
 
 // ========== RENDER TRACKS =========
-function getUserTracks(){if(!currentUser)return[];if(currentUser.role==='admin')return tracks;return tracks.filter(t=>t.owner===currentUser.id||t.type==='gdrive')}
+function getUserTracks(){if(!currentUser)return[];if(currentUser.role==='admin')return tracks;return tracks.filter(t=>t.owner===currentUser.id||t.owner==='shared'||t.type==='gdrive')}
 function getUserAudios(){return getUserTracks().filter(t=>!isVideoTrack(t))}
 function renderTracks(){
     const list=$('trackList');if(!list)return;
@@ -1112,12 +1657,20 @@ window.playAllTracks=playAllTracks;
 function loadAndPlay(resumePos){
     if(currentPlaylistIndex<0||currentPlaylistIndex>=currentPlaylist.length)return;
     const t=currentPlaylist[currentPlaylistIndex];
-    // Item video tidak lewat <audio> — alihkan ke pemutar video Event
     if(isVideoTrack(t)){ playEventVideoCurrent(); return; }
     stopEventVideo();
-    audio.src=normalizeGdrive(t.src);audio.volume=(activeScheduleVolumePct/100)*(t.volume||100)/100*(settings.volume/100);
-    audio.onloadedmetadata=()=>{if(resumePos&&resumePos>0&&resumePos<audio.duration){audio.currentTime=resumePos}const cur=currentPlaylist[currentPlaylistIndex];if(cur&&!(cur.duration>0)&&audio.duration>0){cur.duration=audio.duration;if(isSupabaseConfigured()){try{getSupabase().from('tracks').update({duration:cur.duration}).eq('id',cur.id)}catch(e){}}}};
-    audio.play().catch(()=>{});isPlaying=true;
+    audio.src=normalizeGdrive(t.src);
+    audio.volume=(activeScheduleVolumePct/100)*(t.volume||100)/100*(settings.volume/100);
+    audio.onloadedmetadata=()=>{
+        if(resumePos&&resumePos>0&&resumePos<audio.duration){audio.currentTime=resumePos}
+        const cur=currentPlaylist[currentPlaylistIndex];
+        if(cur&&!(cur.duration>0)&&audio.duration>0){
+            cur.duration=audio.duration;
+            if(isNeonConfigured()){try{getNeonClient().from('tracks').update({duration:cur.duration}).eq('id',cur.id)}catch(e){}}
+        }
+    };
+    audio.play().catch(()=>{});
+    isPlaying=true;
     updatePlayPauseBtn();renderTracks();renderUpacaras();
 }
 function resumePlaying(){
@@ -1125,9 +1678,11 @@ function resumePlaying(){
     const t=currentPlaylist[currentPlaylistIndex];
     if(isVideoTrack(t)){ playEventVideoCurrent(); return; }
     stopEventVideo();
-    audio.src=normalizeGdrive(t.src);audio.volume=(activeScheduleVolumePct/100)*(t.volume||100)/100*(settings.volume/100);
+    audio.src=normalizeGdrive(t.src);
+    audio.volume=(activeScheduleVolumePct/100)*(t.volume||100)/100*(settings.volume/100);
     audio.onloadedmetadata=()=>{if(pausedPosition>0&&pausedPosition<audio.duration){audio.currentTime=pausedPosition}};
-    audio.play().catch(()=>{});isPlaying=true;
+    audio.play().catch(()=>{});
+    isPlaying=true;
     updatePlayPauseBtn();renderTracks();renderUpacaras();
 }
 function togglePlayPause(){
@@ -1143,11 +1698,88 @@ function togglePlayPause(){
     updatePlayPauseBtn();
 }
 window.togglePlayPause=togglePlayPause;
+function updateBottomPlayerBar(){
+    const bar = $('bottomPlayerBar');
+    if (!bar) return;
+    const cur = currentPlaylist[currentPlaylistIndex];
+    if ((isPlaying || pausedPosition > 0 || (audio.currentTime > 0 && !audio.ended)) && cur) {
+        bar.classList.remove('hidden');
+        
+        const titleEl = $('bottomTrackTitle');
+        if (titleEl && titleEl.textContent !== cur.name) titleEl.textContent = cur.name;
+        
+        const badgeEl = $('bottomTrackBadge');
+        if (badgeEl) {
+            const isGdrive = cur.type === 'gdrive';
+            const isOffline = cur.type === 'offline';
+            badgeEl.textContent = isOffline ? 'Lokal' : (isGdrive ? 'GDrive' : 'Online');
+            badgeEl.className = isOffline 
+                ? 'px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-800'
+                : (isGdrive 
+                    ? 'px-1.5 py-0.2 rounded text-[9px] font-semibold bg-blue-100 text-blue-800'
+                    : 'px-1.5 py-0.2 rounded text-[9px] font-semibold bg-purple-100 text-purple-800');
+        }
+        
+        const iconEl = $('bottomTrackIcon');
+        if (iconEl) iconEl.textContent = cur.type === 'gdrive' ? 'drive_file_move' : (cur.type === 'offline' ? 'computer' : 'music_note');
+
+        const pi = $('bottomPlayPauseIcon');
+        if (pi) pi.textContent = isPlaying ? 'pause' : 'play_arrow';
+        
+        const shufBtn = $('bottomShuffleBtn');
+        if (shufBtn) shufBtn.className = settings.shuffle 
+            ? 'p-1.5 text-emerald-600 hover:text-emerald-700 transition' 
+            : 'p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition';
+            
+        const repBtn = $('bottomRepeatBtn');
+        if (repBtn) repBtn.className = settings.repeat 
+            ? 'p-1.5 text-emerald-600 hover:text-emerald-700 transition' 
+            : 'p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition';
+            
+        const volSlider = $('bottomVolumeSlider');
+        if (volSlider && document.activeElement !== volSlider) volSlider.value = settings.volume;
+        const volLbl = $('bottomVolumeLabel');
+        if (volLbl) volLbl.textContent = settings.volume + '%';
+        const volIco = $('bottomVolumeIcon');
+        if (volIco) volIco.textContent = settings.volume === 0 ? 'volume_off' : (settings.volume < 40 ? 'volume_down' : 'volume_up');
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+window.updateBottomPlayerBar = updateBottomPlayerBar;
+
+let _prevVolume = 70;
+function toggleMute(){
+    if (settings.volume > 0) {
+        _prevVolume = settings.volume;
+        setMasterVolume(0);
+    } else {
+        setMasterVolume(_prevVolume || 70);
+    }
+}
+window.toggleMute = toggleMute;
+
+function stopPlayback(){
+    audio.pause();
+    isPlaying=false;
+    pausedPosition=0;
+    activeScheduleId=null;
+    manualPauseKey=null;
+    manualOverrideUntil=0;
+    isLibraryPlaying=false;
+    currentPlaylist=[];
+    currentPlaylistIndex=-1;
+    updatePlayPauseBtn();
+    renderTracks();
+    renderUpacaras();
+}
+window.stopPlayback=stopPlayback;
+
 function updatePlayPauseBtn(){
     const pi=$('playPauseIcon');if(pi)pi.textContent=isPlaying?'pause':'play_arrow';
     document.querySelectorAll('[data-sched-icon]').forEach(el=>{el.textContent=(isPlaying&&activeScheduleId===el.getAttribute('data-sched-icon'))?'pause':'play_arrow'});
     renderUpacaras();
-    
+    updateBottomPlayerBar();
 }
 function nextTrack(){
     if(currentPlaylistIndex<currentPlaylist.length-1){
@@ -1169,9 +1801,45 @@ function seekTrack(e){
     if(audio.duration){audio.currentTime=pct*audio.duration;pausedPosition=0}
 }
 window.seekTrack=seekTrack;
-function setMasterVolume(v){settings.volume=parseInt(v);if(currentPlaylist[currentPlaylistIndex])audio.volume=(currentPlaylist[currentPlaylistIndex].volume||100)/100*(v/100);const ev=eventVideoEl();if(ev){try{ev.volume=(parseInt(v)||0)/100;}catch{}}const pv=$('videoPlayerEl');if(pv){try{pv.volume=(parseInt(v)||0)/100;}catch{}}saveLocal()}
+function setMasterVolume(v){
+    const val = parseInt(v) || 0;
+    settings.volume = val;
+    if(currentPlaylist[currentPlaylistIndex]) audio.volume = (currentPlaylist[currentPlaylistIndex].volume||100)/100*(val/100);
+    const ev = eventVideoEl(); if(ev) try{ ev.volume = val/100; }catch{}
+    const pv = $('videoPlayerEl'); if(pv) try{ pv.volume = val/100; }catch{}
+    const volSlider = $('bottomVolumeSlider');
+    if(volSlider && volSlider.value != val) volSlider.value = val;
+    const volLbl = $('bottomVolumeLabel');
+    if(volLbl) volLbl.textContent = val + '%';
+    const volIco = $('bottomVolumeIcon');
+    if(volIco) volIco.textContent = val === 0 ? 'volume_off' : (val < 40 ? 'volume_down' : 'volume_up');
+    saveLocal();
+}
 window.setMasterVolume=setMasterVolume;
-audio.ontimeupdate=()=>{if(audio.duration){const pf=$('playerProgressFill');if(pf)pf.style.width=(audio.currentTime/audio.duration*100)+'%';const pc=$('playingTime');if(pc)pc.textContent=formatTime(audio.currentTime)+' / '+formatTime(audio.duration);const dpf=$('dashPlayerFill');if(dpf)dpf.style.width=(audio.currentTime/audio.duration*100)+'%';    const dpt=$('dashPlayerTime');if(dpt)dpt.textContent=formatTime(audio.currentTime)+' / '+formatTime(audio.duration);const upf=$('upProgressFill');if(upf)upf.style.width=(audio.currentTime/audio.duration*100)+'%';const upt=$('upPlayingTime');if(upt)upt.textContent=formatTime(audio.currentTime)+' / '+formatTime(audio.duration);const upn=$('upTrackName');if(upn){const c=currentPlaylist[currentPlaylistIndex];if(c)upn.textContent=c.name}const upi=$('upPlayPauseIcon');if(upi)upi.textContent=isPlaying?'pause':'play_arrow';const evf=$('evProgressFill');if(evf)evf.style.width=(audio.currentTime/audio.duration*100)+'%';const evt=$('evPlayingTime');if(evt)evt.textContent=formatTime(audio.currentTime)+' / '+formatTime(audio.duration);const evn=$('evTrackName');if(evn){const c2=currentPlaylist[currentPlaylistIndex];if(c2)evn.textContent=c2.name}const evi=$('evPlayPauseIcon');if(evi)evi.textContent=isPlaying?'pause':'play_arrow'}const dptr=$('dashPlayerTrack');if(dptr){const cur=currentPlaylist[currentPlaylistIndex];if(cur&&dptr.textContent!==cur.name)dptr.textContent=cur.name}};
+audio.ontimeupdate=()=>{
+    if(audio.duration){
+        const pct = (audio.currentTime/audio.duration*100)+'%';
+        const timeTxt = formatTime(audio.currentTime)+' / '+formatTime(audio.duration);
+        
+        const pf=$('playerProgressFill');if(pf)pf.style.width=pct;
+        const pc=$('playingTime');if(pc)pc.textContent=timeTxt;
+        const bpf=$('bottomPlayerProgress');if(bpf)bpf.style.width=pct;
+        const bpt=$('bottomTrackTime');if(bpt)bpt.textContent=timeTxt;
+        
+        const dpf=$('dashPlayerFill');if(dpf)dpf.style.width=pct;
+        const dpt=$('dashPlayerTime');if(dpt)dpt.textContent=timeTxt;
+        const upf=$('upProgressFill');if(upf)upf.style.width=pct;
+        const upt=$('upPlayingTime');if(upt)upt.textContent=timeTxt;
+        const upn=$('upTrackName');if(upn){const c=currentPlaylist[currentPlaylistIndex];if(c)upn.textContent=c.name}
+        const upi=$('upPlayPauseIcon');if(upi)upi.textContent=isPlaying?'pause':'play_arrow';
+        const evf=$('evProgressFill');if(evf)evf.style.width=pct;
+        const evt=$('evPlayingTime');if(evt)evt.textContent=timeTxt;
+        const evn=$('evTrackName');if(evn){const c2=currentPlaylist[currentPlaylistIndex];if(c2)evn.textContent=c2.name}
+        const evi=$('evPlayPauseIcon');if(evi)evi.textContent=isPlaying?'pause':'play_arrow';
+    }
+    const dptr=$('dashPlayerTrack');if(dptr){const cur=currentPlaylist[currentPlaylistIndex];if(cur&&dptr.textContent!==cur.name)dptr.textContent=cur.name}
+    const bpi=$('bottomPlayPauseIcon');if(bpi&&bpi.textContent!==(isPlaying?'pause':'play_arrow'))bpi.textContent=isPlaying?'pause':'play_arrow';
+};
 // Lanjutkan otomatis ke lagu berikutnya ketika satu lagu selesai diputar (playlist/jadwal).
 // Khusus pemutaran dari Library (playTrack/playAllTracks): cukup BERHENTI, tidak lanjut ke lagu berikutnya.
 audio.onended=()=>{if(isPrayerTime)return;if(isLibraryPlaying){isLibraryPlaying=false;audio.currentTime=0;pausedPosition=0;isPlaying=false;stopAfterPlaylist=false;loopPlaylist=false;activeScheduleId=null;manualPauseKey=null;manualOverrideUntil=0;updatePlayPauseBtn();renderTracks();renderUpacaras();return}nextTrack()};
@@ -1246,11 +1914,11 @@ async function savePlaylist(){
     const ids=[...editingPlaylistIds];
     if(!ids.length){toast('Pilih minimal 1 lagu');return}
     if(editingId){
-        if(isSupabaseConfigured())await getSupabase().from('playlists').update({name,track_ids:ids}).eq('id',editingId);
+        if(isNeonConfigured())await getNeonClient().from('playlists').update({name,track_ids:ids}).eq('id',editingId);
         const p=playlists.find(p=>p.id===editingId);if(p){p.name=name;p.track_ids=ids}
     }else{
         const pl={id:genId(),name,track_ids:ids,owner:currentUser.id};
-        if(isSupabaseConfigured()){await getSupabase().from('playlists').insert(pl);playlists.unshift(pl)}
+        if(isNeonConfigured()){await getNeonClient().from('playlists').insert(pl);playlists.unshift(pl)}
         else playlists.push(pl);
     }
     saveLocal();renderPlaylists();closeModal('playlistModal');toast('Tersimpan');
@@ -1281,11 +1949,11 @@ window.openUpacaraModal=openUpacaraModal;
 async function saveUpacara(){
     const name=$('upacaraName').value.trim();if(!name){toast('Nama harus diisi');return}
     if(editingId){
-        if(isSupabaseConfigured())await getSupabase().from('upacaras').update({name}).eq('id',editingId);
+        if(isNeonConfigured())await getNeonClient().from('upacaras').update({name}).eq('id',editingId);
         const u=upacaras.find(u=>u.id===editingId);if(u)u.name=name;
     }else{
         const up={id:genId(),name,track_ids:[],play_once:true,owner:currentUser.id};
-        if(isSupabaseConfigured()){await getSupabase().from('upacaras').insert(up);upacaras.unshift(up)}
+        if(isNeonConfigured()){await getNeonClient().from('upacaras').insert(up);upacaras.unshift(up)}
         else upacaras.push(up);
         activeUpacaraId=up.id;
     }
@@ -1314,14 +1982,14 @@ async function addSongsToUpacara(){
     const ids=Array.from($('upacaraSongPicker').querySelectorAll('input:checked')).map(c=>c.value);
     const merged=Array.from(new Set([...u.track_ids,...ids]));
     u.track_ids=merged;
-    if(isSupabaseConfigured())await getSupabase().from('upacaras').update({track_ids:merged}).eq('id',u.id);
+    if(isNeonConfigured())await getNeonClient().from('upacaras').update({track_ids:merged}).eq('id',u.id);
     saveLocal();closeModal('upacaraTrackModal');renderUpacaras();toast('Lagu ditambahkan');
 }
 window.addSongsToUpacara=addSongsToUpacara;
 function removeSongFromUpacara(uid,tid){
     const u=upacaras.find(u=>u.id===uid);if(!u)return;
     u.track_ids=u.track_ids.filter(id=>id!==tid);
-    if(isSupabaseConfigured())getSupabase().from('upacaras').update({track_ids:u.track_ids}).eq('id',uid);
+    if(isNeonConfigured())getNeonClient().from('upacaras').update({track_ids:u.track_ids}).eq('id',uid);
     saveLocal();renderUpacaras();
 }
 window.removeSongFromUpacara=removeSongFromUpacara;
@@ -1330,7 +1998,7 @@ async function moveUpacaraSong(uid,tid,dir){
     const i=u.track_ids.indexOf(tid);const j=i+dir;
     if(i<0||j<0||j>=u.track_ids.length)return;
     [u.track_ids[i],u.track_ids[j]]=[u.track_ids[j],u.track_ids[i]];
-    if(isSupabaseConfigured())await getSupabase().from('upacaras').update({track_ids:u.track_ids}).eq('id',u.id);
+    if(isNeonConfigured())await getNeonClient().from('upacaras').update({track_ids:u.track_ids}).eq('id',u.id);
     saveLocal();renderUpacaras();
 }
 window.moveUpacaraSong=moveUpacaraSong;
@@ -1477,7 +2145,7 @@ window.playEventVideoCurrent=playEventVideoCurrent;
 // ON = adzan tidak bunyi + logika jeda 5 menit sebelum adzan diberhentikan.
 function renderBcAdzanBtn(){
     const b=$('bcAdzanBtn');if(!b)return;
-    b.textContent=eventAdzanMuted?'🔕 Jeda Adzan: ON':'🔔 Jeda Adzan: OFF';
+    b.textContent=eventAdzanMuted?'🕔 Jeda Adzan: ON':'🔔 Jeda Adzan: OFF';
     b.style.background=eventAdzanMuted?'#ef4444':'';
     b.style.color=eventAdzanMuted?'#fff':'';
     b.style.borderColor=eventAdzanMuted?'#ef4444':'';
@@ -1575,11 +2243,11 @@ async function saveSchedule(){
     }
     const data={title,start_time:startT,end_time:endT,days,source_type:type,source_id:sid,loop,volume:volValue('schedModal'),enabled:true,owner:currentUser.id};
     if(editingId){
-        if(isSupabaseConfigured())await getSupabase().from('schedules').update(data).eq('id',editingId);
+        if(isNeonConfigured())await getNeonClient().from('schedules').update(data).eq('id',editingId);
         const s=schedules.find(s=>s.id===editingId);if(s)Object.assign(s,data);
     }else{
         data.id=genId();
-        if(isSupabaseConfigured()){await getSupabase().from('schedules').insert(data);schedules.unshift(data)}
+        if(isNeonConfigured()){await getNeonClient().from('schedules').insert(data);schedules.unshift(data)}
         else schedules.push(data);
     }
     saveLocal();renderSchedules();closeModal('scheduleModal');toast('Tersimpan');
@@ -1740,7 +2408,7 @@ async function removeUser(userId){
 window.removeUser=removeUser;
 
 // ========== CLEAR ==========
-async function clearAllData(){if(!confirm('Hapus SEMUA data?'))return;tracks=[];playlists=[];upacaras=[];schedules=[];try{stopEventVideo();}catch{}saveLocal();if(isSupabaseConfigured()){try{const sb=getSupabase();await sb.from('tracks').delete();await sb.from('playlists').delete();await sb.from('upacaras').delete();await sb.from('schedules').delete();}catch(e){toast('DB gagal dihapus: '+(e.message||''))}}audio.pause();isPlaying=false;currentPlaylist=[];renderTracks();renderPlaylists();renderUpacaras();renderSchedules();renderDashboard();toast('Semua data dihapus')}
+async function clearAllData(){if(!confirm('Hapus SEMUA data?'))return;tracks=[];playlists=[];upacaras=[];schedules=[];try{stopEventVideo();}catch{}saveLocal();if(isNeonConfigured()){try{const sb=getNeonClient();await sb.from('tracks').delete();await sb.from('playlists').delete();await sb.from('upacaras').delete();await sb.from('schedules').delete();}catch(e){toast('DB gagal dihapus: '+(e.message||''))}}audio.pause();isPlaying=false;currentPlaylist=[];renderTracks();renderPlaylists();renderUpacaras();renderSchedules();renderDashboard();toast('Semua data dihapus')}
 window.clearAllData=clearAllData;
 
 function nextScheduleStartMin(s,now=new Date()){const nm=now.getHours()*60+now.getMinutes(),td=now.getDay();for(let d=0;d<7;d++){const cd=(td+d)%7;if(s.days.includes(cd)){const[sh,sm]=s.start_time.split(':').map(Number);const startMin=sh*60+sm;if(d===0){if(startMin>nm)return startMin-nm}else return(24*60-nm)+(d-1)*24*60+startMin}}return Infinity}
@@ -1765,7 +2433,7 @@ function renderStorageCard(){
         if(gdriveMB>0) $('storageGdriveSize').textContent=gdriveCount+' file • '+gdriveMB.toFixed(1)+' MB';
         else $('storageGdriveSize').textContent=gdriveCount+' file';
     }
-    const onlineMode=isSupabaseConfigured()&&currentUser&&(currentUser.storage_limit||0)>0;
+    const onlineMode=isNeonConfigured()&&currentUser&&(currentUser.storage_limit||0)>0;
     let usedMB=0;
     if(onlineMode){
         usedMB=tracks.filter(t=>t.type==='online'&&t.owner===currentUser.id).reduce((a,t)=>a+(parseFloat(t.size)||0),0);
@@ -1852,7 +2520,7 @@ window.toggleSchedulePlay=toggleSchedulePlay;
 async function setScheduleVolume(id,v){
     const s=schedules.find(x=>x.id===id);if(!s)return;
     s.volume=Math.max(0,parseInt(v)||0);
-    if(isSupabaseConfigured()){try{await getSupabase().from('schedules').update({volume:s.volume}).eq('id',id)}catch(e){}}
+    if(isNeonConfigured()){try{await getNeonClient().from('schedules').update({volume:s.volume}).eq('id',id)}catch(e){}}
     saveLocal();
     if(activeScheduleId===id){
         activeScheduleVolumePct=s.volume;
@@ -1936,23 +2604,16 @@ window.addEventListener('offline',()=>{$('connectionText').textContent='Offline'
 // Host  : overlay layar penuh tanpa login (#hostScreen)
 // ==================================================================
 const BC={hosts:[],sel:new Set(),ch:null,tick:null,offMs:null,offAt:0};
-const HS={active:false,row:null,name:'',ch:null,hbT:null,reT:null,player:null,driveEl:null,driveSrc:null,curType:null,curUrl:null,playingVid:null,pending:new Map(),vol:null,muted:false,mediaShown:false,queue:null,qIdx:0,qHold:false};
-const bcSb=()=>isSupabaseConfigured()?getSupabase():null;
+const HS={active:false,row:null,name:'',ch:null,hbT:null,reT:null,cmdPoll:null,lastCmdAt:null,player:null,driveEl:null,driveSrc:null,curType:null,curUrl:null,playingVid:null,pending:new Map(),vol:null,muted:false,mediaShown:false,queue:null,qIdx:0,qHold:false};
+const bcSb=()=>isNeonConfigured()?getNeonClient():null;
 function bcEsc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 
 // --- estimasi waktu server (fondasi Play serentak) ---
 const BC_ENV=(import.meta.env||{});
-const bcRestUrl=()=>(BC_ENV.VITE_SUPABASE_URL||'').replace(/\/$/,'')+'/rest/v1';
+const bcRestUrl=()=>(BC_ENV.VITE_NEON_DATA_API_URL||'');
 async function bcServerNow(){
     if(BC.offMs!==null&&Date.now()-BC.offAt<300000)return Date.now()+BC.offMs;
-    const key=BC_ENV.VITE_SUPABASE_ANON_KEY;
-    if(bcRestUrl()&&key){try{
-        const t0=Date.now();
-        const res=await fetch(bcRestUrl()+'/broadcast_hosts?select=id&limit=1',{headers:{apikey:key,Authorization:'Bearer '+key}});
-        const srv=new Date(res.headers.get('date')).getTime();
-        if(!isNaN(srv)){BC.offMs=srv-t0;BC.offAt=Date.now()}
-    }catch(e){}}
-    return Date.now()+(BC.offMs||0);
+    return Date.now();
 }
 // --- YouTube IFrame API (dimuat hanya saat dibutuhkan) ---
 let _ytLoading=null;
@@ -1993,25 +2654,19 @@ function bcEnsureAdminRealtime(){
     const sb=bcSb();
     $('bcNoSupabase').classList.toggle('hidden',!!sb);
     if(!sb||!currentUser)return;
-    if(!BC.ch){
-        BC.ch=sb.channel('bc-admin')
-            .on('postgres_changes',{event:'*',schema:'public',table:'broadcast_hosts',filter:'owner_id=eq.'+currentUser.id},p=>{
-                if(p.eventType==='DELETE')bcFetchHosts();
-                else{bcUpsertLocal(p.new);renderBcHosts()}
-            })
-            .subscribe(st=>{if(st==='SUBSCRIBED')bcFetchHosts()});
+    if(!BC.tick){
+        bcFetchHosts();
         BC.tick=setInterval(()=>{
             if(!$('page-broadcast')?.classList.contains('active'))return;
             let ch=false;
             BC.hosts.forEach(h=>{const on=bcIsOnline(h);if(!!h._on!==on){h._on=on;ch=true}});
             if(ch)renderBcHosts();
-            else if(new Date().getSeconds()<12)bcFetchHosts();
-        },10000);
+            else bcFetchHosts();
+        },5000);
     }else bcFetchHosts();
 }
 function bcStopAdminRealtime(){
     clearInterval(BC.tick);BC.tick=null;
-    try{if(BC.ch&&isSupabaseConfigured())getSupabase().removeChannel(BC.ch)}catch(e){}
     BC.ch=null;
 }
 function renderBcHosts(){
@@ -2553,24 +3208,21 @@ function hsStartHeartbeat(){
 function hsSubscribeChannel(isRetry){
     const sb=bcSb();if(!sb||!HS.row)return;
     clearTimeout(HS.reT);
-    if(HS.ch)sb.removeChannel(HS.ch).catch(()=>{});
-    HS.ch=sb.channel('bc-host-'+HS.row.id)
-        .on('postgres_changes',{event:'INSERT',schema:'public',table:'broadcast_commands',filter:'host_id=eq.'+HS.row.id},p=>hsExec(p.new))
-        .subscribe(async st=>{
-            if(st==='SUBSCRIBED'){
-                $('hsConnState').textContent='';
-                hsSetOnline('online');
-                // replay perintah yang terlewat saat putus koneksi (max 30 detik ke belakang)
-                try{
-                    const since=new Date(Date.now()-30000).toISOString();
-                    const {data:rows}=await sb.from('broadcast_commands').select('*').eq('host_id',HS.row.id).gte('created_at',since);
-                    if(rows)for(const c of rows.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)))hsExec(c);
-                }catch(e){}
-            }else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'||st==='CLOSED'){
-                $('hsConnState').textContent='Koneksi terputus — menyambung ulang otomatis…';
-                clearTimeout(HS.reT);HS.reT=setTimeout(()=>hsSubscribeChannel(true),2500);
-            }
-        });
+    if(HS.cmdPoll) clearInterval(HS.cmdPoll);
+    HS.lastCmdAt = new Date(Date.now()-30000).toISOString();
+    hsSetOnline('online');
+    // replay perintah yang terlewat (max 30 detik ke belakang)
+    (async()=>{ try {
+        const {data:rows}=await sb.from('broadcast_commands').select('*').eq('host_id',HS.row.id).gte('created_at',HS.lastCmdAt);
+        if(rows) for(const c of rows.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at))){ HS.lastCmdAt=c.created_at; await hsExec(c); }
+    } catch(e){} })();
+    HS.cmdPoll=setInterval(async()=>{
+        if(!HS.active||!HS.row)return;
+        try {
+            const {data:rows}=await sb.from('broadcast_commands').select('*').eq('host_id',HS.row.id).gt('created_at',HS.lastCmdAt).order('created_at');
+            if(rows&&rows.length) for(const c of rows){ HS.lastCmdAt=c.created_at; await hsExec(c); }
+        } catch(e){}
+    },2000);
 }
 async function hsExec(c){
     if(!c||!c.command||HS.pending.has(c.id)||!HS.active)return;
@@ -2745,17 +3397,15 @@ function hsEnterFs(){
 }
 window.hsToggleFullscreen=()=>{try{document.fullscreenElement?document.exitFullscreen():hsEnterFs()}catch(e){}};
 function hsStopHostSession(){
-    clearInterval(HS.hbT);clearTimeout(HS.reT);
-    try{if(HS.ch&&isSupabaseConfigured())getSupabase().removeChannel(HS.ch)}catch(e){}
-    HS.ch=null;
+    clearInterval(HS.hbT);clearTimeout(HS.reT);if(HS.cmdPoll)clearInterval(HS.cmdPoll);HS.cmdPoll=null;
     try{if(HS.player&&HS.player.destroy)HS.player.destroy()}catch(e){}
     HS.player=null;
     try{if(HS.driveEl)HS.driveEl.remove()}catch(e){}
     HS.driveEl=null;HS.driveSrc=null;HS.curType=null;HS.curUrl=null;HS.playingVid=null;
     HS.queue=null;HS.qIdx=0;HS.qHold=false;
     HS.mediaShown=false;
-    if(HS.row&&isSupabaseConfigured()){
-        getSupabase().from('broadcast_hosts').update({status:'offline',media_status:'stopped'}).eq('id',HS.row.id).catch(()=>{});
+    if(HS.row&&isNeonConfigured()){
+        getNeonClient().from('broadcast_hosts').update({status:'offline',media_status:'stopped'}).eq('id',HS.row.id).catch(()=>{});
     }
     HS.row=null;HS.active=false;
     try{localStorage.removeItem('musik-pintar-host-open')}catch(e){}
