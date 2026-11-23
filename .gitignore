@@ -1,8 +1,10 @@
 # Dependencies
 node_modules/
 
-# Build output
+# Build output & Desktop release binaries
 dist/
+release/
+data/
 
 # Environment / kredensial (JANGAN di-push)
 .env

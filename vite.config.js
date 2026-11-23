@@ -15,7 +15,8 @@ export default defineConfig({
     open: true
   },
   preview: {
-    port: 3000
+    port: 3000,
+    allowedHosts: true
   },
   css: {
     devSourcemap: true

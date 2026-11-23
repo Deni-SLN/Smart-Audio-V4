@@ -1,4 +1,4 @@
-const CACHE_NAME = 'musik-pintar-v7';
+const CACHE_NAME = 'musik-pintar-v9';
 const AUDIO_CACHE = 'musik-pintar-audio-v4';
 
 // Install
@@ -9,7 +9,9 @@ self.addEventListener('install', event => {
                 '/',
                 '/index.html',
                 '/manifest.json',
-                '/favicon.svg'
+                '/favicon.svg',
+                '/icon-192.png',
+                '/icon-512.png'
             ]);
         })
     );

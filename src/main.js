@@ -1057,18 +1057,85 @@ function updateCountdown(now){
     const cl=$('countdownLabel');if(cl)cl.textContent=`hingga ${nextN} jam ${prayerTimes[nextN]||'--:--'}`;
     const nb=$('nextPrayerBadge');if(nb)nb.textContent=nextN||'--';
 }
-function autoDetectLocation(){if(!navigator.geolocation){toast('Tidak didukung');return}toast('Mendeteksi...');navigator.geolocation.getCurrentPosition(async p=>{
-    settings.lat=p.coords.latitude;settings.lng=p.coords.longitude;
+async function applyDetectedLocation(lat, lng, placeName){
+    settings.lat = lat;
+    settings.lng = lng;
     try{ LS.set('site_loc_saved',{lat:settings.lat,lng:settings.lng,t:Date.now()}); }catch(e){}
     saveLocal(); saveSiteLocationNow(); await saveUserSettingsNow();
     if($('latInput'))$('latInput').value=settings.lat;if($('lngInput'))$('lngInput').value=settings.lng;
     prayerTimes=calcPrayerTimes(settings.lat,settings.lng);renderPrayerGrid();
-    let place=`${settings.lat.toFixed(4)}, ${settings.lng.toFixed(4)}`;
-    try{const r=await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${settings.lat}&longitude=${settings.lng}&localityLanguage=id`);const d=await r.json();place=d.city||d.locality||d.principalSubdivision||place;if(d.locality&&d.city&&d.city!==d.locality)place=d.locality+', '+d.city;else if(d.city)place=d.city;else if(d.locality)place=d.locality}catch(e){}
+    let place = placeName || `${settings.lat.toFixed(4)}, ${settings.lng.toFixed(4)}`;
+    if(!placeName){
+        try{
+            const r=await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${settings.lat}&longitude=${settings.lng}&localityLanguage=id`);
+            const d=await r.json();
+            place=d.city||d.locality||d.principalSubdivision||place;
+            if(d.locality&&d.city&&d.city!==d.locality)place=d.locality+', '+d.city;
+            else if(d.city)place=d.city;
+            else if(d.locality)place=d.locality;
+        }catch(e){}
+    }
     try{ LS.set('locationName',place); LS.set('site_loc_name',place); }catch(e){}
     refreshLocationDisplays();
-    toast('Lokasi terdeteksi: '+place+' — berlaku untuk semua device')
-},e=>toast('Gagal: '+e.message))}
+    toast('Lokasi terdeteksi: ' + place + ' — tersimpan untuk semua perangkat');
+}
+
+async function detectLocationByIP(){
+    toast('Mendeteksi lokasi via Jaringan / IP...');
+    try {
+        let lat = null, lng = null, place = null;
+        try {
+            const r = await fetch('https://ipwho.is/');
+            if(r.ok){
+                const d = await r.json();
+                if(d.success !== false && d.latitude && d.longitude){
+                    lat = d.latitude; lng = d.longitude;
+                    place = d.city ? (d.city + (d.region ? ', ' + d.region : '')) : d.country;
+                }
+            }
+        } catch(e){}
+
+        if(!lat || !lng){
+            try {
+                const r2 = await fetch('https://ipapi.co/json/');
+                if(r2.ok){
+                    const d2 = await r2.json();
+                    if(d2.latitude && d2.longitude){
+                        lat = d2.latitude; lng = d2.longitude;
+                        place = d2.city || d2.region || 'Indonesia';
+                    }
+                }
+            } catch(e){}
+        }
+
+        if(lat && lng){
+            await applyDetectedLocation(lat, lng, place);
+        } else {
+            toast('GPS dibatasi di HTTP. Silakan gunakan tombol "Pilih Kota".');
+        }
+    } catch(err){
+        toast('Gagal deteksi IP. Silakan gunakan tombol "Pilih Kota".');
+    }
+}
+
+function autoDetectLocation(){
+    if(!navigator.geolocation){
+        detectLocationByIP();
+        return;
+    }
+    toast('Mendeteksi lokasi GPS...');
+    navigator.geolocation.getCurrentPosition(
+        async p => {
+            await applyDetectedLocation(p.coords.latitude, p.coords.longitude, null);
+        },
+        async err => {
+            console.warn('GPS hardware gagal / dibatasi browser HTTP:', err.message);
+            // Fallback otomatis ke deteksi IP jika kena error "Only secure origins are allowed" atau permission denied
+            await detectLocationByIP();
+        },
+        { timeout: 7000 }
+    );
+}
 window.autoDetectLocation=autoDetectLocation;
 
 // ========== ADZAN ==========
@@ -1422,7 +1489,8 @@ async function addGDriveTrack(){
     }
     tracks.unshift(track);saveLocal();renderTracks();
     $('gdriveNameInput').value='';$('gdriveLinkInput').value='';
-    toast(kind==='video'?'Video Google Drive ditambahkan':'Lagu Google Drive ditambahkan');ensureTrackDurations();
+    try { fetch(src + '&action=preload').catch(()=>{}); } catch(e){}
+    toast(kind==='video'?'Video Google Drive ditambahkan (menyimpan ke server...)':'Lagu Google Drive ditambahkan (menyimpan ke server...)');ensureTrackDurations();
 }
 window.addGDriveTrack=addGDriveTrack;
 
@@ -2281,13 +2349,190 @@ function renderSchedules(){
         const durSec = computeSourceDuration(s.source_type,s.source_id);
         const durStr = durSec>0 ? formatTime(durSec) : '—';
         const winDur = (()=>{ if(s.loop===false) return durStr; const[sh,sm]=s.start_time.split(':').map(Number); const[eh,em]=s.end_time.split(':').map(Number); const m=(eh*60+em)-(sh*60+sm); return m>0?`${Math.floor(m/60)}j ${m%60}m`:`${m}m`; })();
-        return`<div class="glass-card rounded-xl p-4"><div class="flex justify-between items-start gap-3"><div class="min-w-0 flex-1"><h4 class="text-sm font-bold truncate">${s.title}</h4><p class="text-[11px] text-on-surface-variant truncate">${s.start_time}${s.loop===false?' • berhenti saat musik selesai':' - '+s.end_time} • ${s.loop?'Loop':'1x'} • ${sourceName}</p></div><span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${sc} shrink-0">${st}</span></div><div class="flex flex-wrap items-center gap-1.5 mt-2"><span class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-900 text-white font-bold shrink-0"><span class="material-symbols-outlined text-[12px]">volume_up</span> ${vol}%</span><span class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-on-surface-variant font-bold shrink-0"><span class="material-symbols-outlined text-[12px]">schedule</span> ${durStr} • ${winDur}</span><span class="inline-flex gap-0.5 flex-wrap">${[0,1,2,3,4,5,6].map(d=>`<span class="text-[9px] px-1 py-0.5 rounded ${s.days.includes(d)?'bg-black text-white':'bg-gray-100 text-on-surface-variant'}">${DAY_NAMES[d]}</span>`).join('')}</span></div><div class="flex gap-1.5 items-center mt-2.5"><label class="relative inline-flex items-center cursor-pointer"><input type="checkbox" ${s.enabled?'checked':''} class="sr-only peer" onchange="toggleSchedule('${s.id}',this.checked)"><div class="w-8 h-4 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all"></div></label><button class="text-[11px] px-2 py-0.5 rounded border border-outline-variant" onclick="openScheduleModal('${s.id}')">Edit</button><button class="text-[11px] px-2 py-0.5 rounded border border-red-300 text-red-500" onclick="removeSchedule('${s.id}')">Hapus</button></div></div>`;
+        const durLabel = s.loop===false ? durStr : `${durStr} • ${winDur}`;
+        const timeSub = s.loop===false ? '1x' : s.end_time;
+        const modeDesc = s.loop===false ? 'Berhenti saat musik selesai' : `Loop s.d. ${s.end_time}`;
+        const borderAccent = active ? 'border-l-4 border-l-emerald-500' : (!s.enabled ? 'opacity-70' : '');
+        return`<div class="glass-card rounded-xl p-3.5 sm:p-4 hover:border-slate-300 transition-colors ${borderAccent}">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
+                <div class="flex items-start gap-3.5 min-w-0 flex-1">
+                    <div class="shrink-0 w-16 rounded-xl bg-slate-50 border border-slate-200/80 px-2 py-2 text-center tabular-nums">
+                        <div class="text-sm font-bold text-slate-900 leading-tight">${s.start_time}</div>
+                        <div class="text-[10px] font-medium text-slate-500 mt-0.5">${timeSub}</div>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h4 class="text-sm font-bold text-slate-900 truncate">${s.title}</h4>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${sc} shrink-0">${st}</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant truncate mt-0.5">${sourceName} <span class="text-slate-300 mx-1">&bull;</span> ${modeDesc}</p>
+                        <div class="flex flex-wrap items-center gap-1.5 mt-2.5">
+                            <span class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-slate-900 text-white font-semibold shrink-0"><span class="material-symbols-outlined text-[12px]">volume_up</span> ${vol}%</span>
+                            <span class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold shrink-0"><span class="material-symbols-outlined text-[12px]">schedule</span> ${durLabel}</span>
+                            <span class="inline-flex gap-1 flex-wrap ml-0.5">${[0,1,2,3,4,5,6].map(d=>`<span class="text-[10px] px-1.5 py-0.5 rounded-md font-medium ${s.days.includes(d)?'bg-slate-900 text-white':'bg-slate-100 text-slate-400'}">${DAY_NAMES[d]}</span>`).join('')}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-2 pt-2.5 border-t border-slate-100 md:pt-0 md:border-t-0 shrink-0">
+                    <label class="toggle-switch mr-1" title="${s.enabled?'Nonaktifkan':'Aktifkan'}"><input type="checkbox" ${s.enabled?'checked':''} onchange="toggleSchedule('${s.id}',this.checked)"><span class="toggle-slider"></span></label>
+                    <button class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition" onclick="openScheduleModal('${s.id}')"><span class="material-symbols-outlined text-[14px]">edit</span>Edit</button>
+                    <button class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition" onclick="removeSchedule('${s.id}')"><span class="material-symbols-outlined text-[14px]">delete</span>Hapus</button>
+                </div>
+            </div>
+        </div>`;
     }).join('');
 }
 function toggleSchedule(id,en){const s=schedules.find(s=>s.id===id);if(s){s.enabled=en;saveLocal();renderSchedules();renderDashboard()}}
 window.toggleSchedule=toggleSchedule;
-async function removeSchedule(id){if(!confirm('Hapus?'))return;schedules=schedules.filter(s=>s.id!==id);saveLocal();renderSchedules();toast('Dihapus')}
+async function removeSchedule(id){if(!confirm('Hapus?'))return;if(isNeonConfigured()){try{await getNeonClient().from('schedules').delete().eq('id',id)}catch(e){}}schedules=schedules.filter(s=>s.id!==id);saveLocal();renderSchedules();toast('Dihapus')}
 window.removeSchedule=removeSchedule;
+
+// ========== EXPORT & IMPORT JADWAL ==========
+function exportSchedules(){
+    const us=currentUser?.role==='admin'?schedules:schedules.filter(s=>s.owner===currentUser?.id);
+    if(!us.length){toast('Belum ada jadwal untuk di-export');return}
+    const exportData = {
+        app: 'smart-audio',
+        version: '4.0',
+        exported_at: new Date().toISOString(),
+        total: us.length,
+        schedules: us.map(s => {
+            let source_name = '';
+            if(s.source_type==='single') source_name = tracks.find(t=>t.id===s.source_id)?.name || '';
+            else if(s.source_type==='playlist') source_name = playlists.find(p=>p.id===s.source_id)?.name || '';
+            else if(s.source_type==='upacara') source_name = upacaras.find(u=>u.id===s.source_id)?.name || '';
+            return {
+                title: s.title,
+                start_time: s.start_time,
+                end_time: s.end_time,
+                days: s.days || [],
+                source_type: s.source_type,
+                source_id: s.source_id,
+                source_name: source_name,
+                loop: s.loop !== false,
+                volume: typeof s.volume === 'number' ? s.volume : 100,
+                enabled: s.enabled !== false
+            };
+        })
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    const dateStr = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+    a.href = url;
+    a.download = `jadwal-musik-${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast(`${us.length} jadwal berhasil di-export`);
+}
+window.exportSchedules = exportSchedules;
+
+let pendingImportSchedules = [];
+
+function handleScheduleImport(event){
+    const file = event.target.files?.[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            let items = Array.isArray(data) ? data : (data.schedules || []);
+            if(!Array.isArray(items) || !items.length){
+                toast('Format file tidak valid atau data jadwal kosong');
+                return;
+            }
+            items = items.filter(x => x && x.title && x.start_time);
+            if(!items.length){
+                toast('Tidak ada jadwal valid yang ditemukan di file');
+                return;
+            }
+            pendingImportSchedules = items;
+            const countEl = $('importScheduleCount');
+            if(countEl) countEl.textContent = items.length;
+            const modal = $('importScheduleModal');
+            if(modal) modal.classList.add('active');
+            else {
+                if(confirm(`Ditemukan ${items.length} jadwal. Gabungkan dengan jadwal yang sudah ada?`)){
+                    applyImportSchedules('merge');
+                }
+            }
+        } catch(err){
+            toast('Gagal membaca file JSON: ' + (err.message || ''));
+        } finally {
+            event.target.value = '';
+        }
+    };
+    reader.readAsText(file);
+}
+window.handleScheduleImport = handleScheduleImport;
+
+async function applyImportSchedules(mode){
+    if(!pendingImportSchedules.length) return;
+    closeModal('importScheduleModal');
+    const uid = currentUser?.id || 'admin';
+    const newItems = pendingImportSchedules.map(item => {
+        let sid = item.source_id;
+        if(item.source_type === 'single' && (!sid || !tracks.some(t => t.id === sid))){
+            const found = tracks.find(t => t.name === item.source_name);
+            if(found) sid = found.id;
+        } else if(item.source_type === 'playlist' && (!sid || !playlists.some(p => p.id === sid))){
+            const found = playlists.find(p => p.name === item.source_name);
+            if(found) sid = found.id;
+        } else if(item.source_type === 'upacara' && (!sid || !upacaras.some(u => u.id === sid))){
+            const found = upacaras.find(u => u.name === item.source_name);
+            if(found) sid = found.id;
+        }
+        return {
+            id: genId(),
+            title: item.title,
+            start_time: item.start_time,
+            end_time: item.end_time || item.start_time,
+            days: Array.isArray(item.days) ? item.days : [1,2,3,4,5],
+            source_type: item.source_type || 'single',
+            source_id: sid || '',
+            loop: item.loop !== false,
+            volume: typeof item.volume === 'number' ? item.volume : 100,
+            enabled: item.enabled !== false,
+            owner: uid
+        };
+    });
+
+    if(mode === 'replace'){
+        if(isNeonConfigured()){
+            try {
+                const sb = getNeonClient();
+                const toDel = schedules.filter(s => currentUser?.role === 'admin' ? true : s.owner === uid);
+                for(const d of toDel){
+                    await sb.from('schedules').delete().eq('id', d.id);
+                }
+            } catch(e){
+                console.warn('Gagal menghapus jadwal lama di Neon:', e);
+            }
+        }
+        if(currentUser?.role === 'admin') schedules = newItems;
+        else schedules = schedules.filter(s => s.owner !== uid).concat(newItems);
+    } else {
+        schedules = [...newItems, ...schedules];
+    }
+
+    if(isNeonConfigured()){
+        try {
+            await getNeonClient().from('schedules').insert(newItems);
+        } catch(e){
+            console.warn('Gagal insert jadwal import ke Neon:', e);
+        }
+    }
+
+    saveLocal();
+    renderSchedules();
+    renderDashboard();
+    toast(`Berhasil mengimpor ${newItems.length} jadwal (${mode === 'replace' ? 'Gantikan Semua' : 'Gabungkan'})`);
+    pendingImportSchedules = [];
+}
+window.applyImportSchedules = applyImportSchedules;
 
 // ========== AUTO PLAY ==========
 function toggleAutoPlay(){autoPlayEnabled=$('autoPlayToggle')?.checked||false;settings.autoPlay=autoPlayEnabled;saveLocal();if(autoPlayEnabled)checkAutoPlay(new Date())}
@@ -2594,7 +2839,51 @@ try{
 setInterval(updateClock,1000);updateClock();
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('active')}));
 const today=new Date().toDateString();if(LS.get('adzanDay','')!==today){adzanPlayedToday={};LS.set('adzanDay',today);LS.set('adzanPlayed',adzanPlayedToday)}
-if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+// ========== PWA SETUP & INSTALL PROMPT ==========
+let deferredPwaPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPwaPrompt = e;
+    const btn = $('pwaInstallBtn');
+    if (btn) {
+        btn.classList.remove('hidden');
+        btn.classList.add('inline-flex');
+    }
+});
+window.addEventListener('appinstalled', () => {
+    deferredPwaPrompt = null;
+    const btn = $('pwaInstallBtn');
+    if (btn) {
+        btn.classList.add('hidden');
+        btn.classList.remove('inline-flex');
+    }
+    toast('Aplikasi Musik Pintar berhasil diinstal!');
+});
+async function promptPwaInstall() {
+    if (!deferredPwaPrompt) {
+        toast('Gunakan menu browser (titik 3) lalu pilih "Instal Musik Pintar"');
+        return;
+    }
+    deferredPwaPrompt.prompt();
+    const choice = await deferredPwaPrompt.userChoice;
+    if (choice?.outcome === 'accepted') {
+        toast('Memasang aplikasi...');
+    }
+    deferredPwaPrompt = null;
+    const btn = $('pwaInstallBtn');
+    if (btn) btn.classList.add('hidden');
+}
+window.promptPwaInstall = promptPwaInstall;
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+            console.log('[PWA] Service Worker registered:', reg.scope);
+        }).catch((err) => {
+            console.warn('[PWA] Service Worker failed:', err);
+        });
+    });
+}
 window.addEventListener('online',()=>{$('connectionText').textContent='Online';$('connectionBadge').querySelector('.material-symbols-outlined').textContent='cloud_done'});
 window.addEventListener('offline',()=>{$('connectionText').textContent='Offline';$('connectionBadge').querySelector('.material-symbols-outlined').textContent='cloud_off'});
 

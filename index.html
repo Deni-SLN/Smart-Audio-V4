@@ -3,8 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#000000">
+    <script>
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID !== 'function') {
+            crypto.randomUUID = function () {
+                const b = new Uint8Array(16);
+                if (typeof crypto.getRandomValues === 'function') {
+                    crypto.getRandomValues(b);
+                } else {
+                    for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+                }
+                b[6] = (b[6] & 0x0f) | 0x40;
+                b[8] = (b[8] & 0x3f) | 0x80;
+                const h = Array.from(b, (v) => v.toString(16).padStart(2, '0')).join('');
+                return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+            };
+        }
+    </script>
+    <meta name="theme-color" content="#10b981">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Musik Pintar">
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
     <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <title>Musik Pintar</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -386,6 +408,120 @@
         html.dark .bg-black{background-color:#1e293b!important}
         html.dark .bg-yellow-50,
         html.dark [class*="bg-yellow"]{background-color:rgba(113,63,18,0.25)!important}
+
+        /* ===== BULLETPROOF TOGGLE SWITCHES ===== */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 38px;
+            height: 22px;
+            flex-shrink: 0;
+            vertical-align: middle;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+            margin: 0;
+            pointer-events: none;
+        }
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background-color: #cbd5e1;
+            border-radius: 9999px;
+            transition: background-color 0.2s ease;
+        }
+        .toggle-slider::before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            top: 3px;
+            background-color: #ffffff;
+            border-radius: 50%;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        }
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: #50C878;
+        }
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(16px);
+        }
+        html.dark .toggle-slider {
+            background-color: #334155 !important;
+        }
+        html.dark .toggle-switch input:checked + .toggle-slider {
+            background-color: #50C878 !important;
+        }
+
+        /* Putar Otomatis Pill (with ON / OFF text) */
+        .auto-toggle {
+            position: relative;
+            display: inline-block;
+            width: 54px;
+            height: 26px;
+            flex-shrink: 0;
+            vertical-align: middle;
+        }
+        .auto-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+            margin: 0;
+            pointer-events: none;
+        }
+        .auto-toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background-color: #cbd5e1;
+            border-radius: 9999px;
+            transition: background-color 0.2s ease;
+        }
+        .auto-toggle-slider::before {
+            position: absolute;
+            content: "OFF";
+            font-size: 9px;
+            font-weight: 700;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 20px;
+            width: 24px;
+            left: 3px;
+            top: 3px;
+            background-color: #ffffff;
+            border-radius: 9999px;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        .auto-toggle input:checked + .auto-toggle-slider {
+            background-color: #50C878;
+        }
+        .auto-toggle input:checked + .auto-toggle-slider::before {
+            content: "ON";
+            color: #2f8f55;
+            transform: translateX(24px);
+        }
+        html.dark .auto-toggle-slider {
+            background-color: #334155 !important;
+        }
+        html.dark .auto-toggle-slider::before {
+            color: #64748b;
+        }
+        html.dark .auto-toggle input:checked + .auto-toggle-slider {
+            background-color: #50C878 !important;
+        }
+        html.dark .auto-toggle input:checked + .auto-toggle-slider::before {
+            color: #2f8f55 !important;
+        }
     </style>
 </head>
 <body class="bg-background font-body text-on-surface flex h-screen overflow-hidden">
@@ -408,7 +544,7 @@
     </ul>
     <div class="px-3 mt-auto space-y-2">
         <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-on-surface-variant hover:bg-gray-50 rounded-lg transition-all text-sm" onclick="logout()"><span class="material-symbols-outlined text-[20px]">logout</span>Logout</a>
-        <p class="text-center text-[10px] text-on-surface-variant opacity-50">© 2026 by deni s · v3.6</p>
+        <p class="text-center text-[10px] text-on-surface-variant opacity-50">© 2026 by deni s · v3.7</p>
     </div>
 </nav>
 
@@ -420,6 +556,10 @@
             <span id="topbarLocation" class="hidden items-center gap-1 text-[11px] text-on-surface-variant bg-gray-50 border border-outline-variant px-2.5 py-1 rounded-full"><span class="material-symbols-outlined text-[14px]" style="color:#50C878">location_on</span><span id="topbarLocationText" class="font-medium">--</span></span>
         </div>
         <div class="flex items-center gap-2 text-on-surface-variant">
+            <button id="pwaInstallBtn" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition shadow-2xs" onclick="promptPwaInstall()" title="Instal Aplikasi ke Komputer/HP">
+                <span class="material-symbols-outlined text-[16px]">install_desktop</span>
+                <span>Instal App</span>
+            </button>
             <button id="darkModeToggle" class="w-9 h-9 rounded-full bg-gray-50 border border-outline-variant flex items-center justify-center hover:bg-gray-100 hover:border-gray-300 transition-colors" onclick="toggleDarkMode()" title="Dark mode"><span class="material-symbols-outlined text-[18px]" id="darkModeIcon">dark_mode</span></button>
             <button class="w-9 h-9 rounded-full bg-gray-50 border border-outline-variant flex items-center justify-center hover:bg-gray-100 hover:border-gray-300 transition-colors" onclick="location.reload()" title="Refresh"><span class="material-symbols-outlined text-[18px]">autorenew</span></button>
         </div>
@@ -926,12 +1066,40 @@
 
         <!-- JADWAL MUSIK -->
         <div class="page" id="page-jadwal">
-            <div class="flex justify-between items-center mb-3"><h2 class="text-lg font-bold">Jadwal Musik</h2><button class="text-sm font-bold px-3 py-1.5 rounded-lg text-white" style="background:#50C878" onclick="openScheduleModal()">+ Tambah Jadwal</button></div>
-            <div class="glass-card rounded-xl p-3 mb-3 flex justify-between items-center gap-3">
-                <div><p class="text-sm font-bold">Putar Otomatis</p><p class="text-[11px] text-on-surface-variant">Jadwal musik mulai sendiri saat masuk jam terjadwal &mdash; matikan jika hanya ingin memutar manual dari Dashboard</p></div>
-                <label class="shrink-0 relative inline-flex items-center cursor-pointer"><input type="checkbox" id="autoPlayToggle" class="sr-only peer" onchange="toggleAutoPlay()"><div class="w-14 h-6 bg-gray-300 rounded-full peer-checked:bg-[#50C878] transition-colors after:content-['OFF'] after:flex after:items-center after:justify-center after:absolute after:top-[3px] after:left-[3px] after:w-7 after:h-[18px] after:bg-white after:rounded-full after:shadow-sm after:text-[9px] after:font-bold after:text-gray-400 after:transition-all after:duration-200 peer-checked:after:translate-x-[22px] peer-checked:after:content-['ON'] peer-checked:after:text-[#2f8f55]"></div></label>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-200 mb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900 tracking-tight">Jadwal Musik</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Atur jadwal pemutaran musik otomatis harian, volume, dan hari aktif.</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button class="inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80 transition shadow-2xs" onclick="exportSchedules()" title="Export Jadwal Musik ke file JSON">
+                        <span class="material-symbols-outlined text-[16px]">file_download</span>
+                        <span>Export</span>
+                    </button>
+                    <label class="inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80 transition shadow-2xs cursor-pointer" title="Import Jadwal Musik dari file JSON">
+                        <span class="material-symbols-outlined text-[16px]">file_upload</span>
+                        <span>Import</span>
+                        <input type="file" id="scheduleImportInput" accept=".json,application/json" class="hidden" onchange="handleScheduleImport(event)">
+                    </label>
+                    <button class="inline-flex items-center justify-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-xl text-white shadow-sm hover:opacity-95 transition shrink-0" style="background:#50C878" onclick="openScheduleModal()">
+                        <span class="material-symbols-outlined text-[18px]">add</span>
+                        <span>Tambah Jadwal</span>
+                    </button>
+                </div>
             </div>
-            <div id="scheduleList" class="space-y-3"></div>
+            <div class="glass-card rounded-xl p-3.5 mb-4 flex justify-between items-center gap-4">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                        <span class="material-symbols-outlined text-[20px]">play_circle</span>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-bold text-slate-900">Putar Otomatis</p>
+                        <p class="text-[11px] text-on-surface-variant">Jadwal musik mulai sendiri saat masuk jam terjadwal &mdash; matikan jika hanya ingin memutar manual dari Dashboard</p>
+                    </div>
+                </div>
+                <label class="auto-toggle"><input type="checkbox" id="autoPlayToggle" onchange="toggleAutoPlay()"><span class="auto-toggle-slider"></span></label>
+            </div>
+            <div id="scheduleList" class="space-y-2.5"></div>
         </div>
 
         <!-- SHOLAT -->
@@ -1206,9 +1374,9 @@
                                 <h4 class="text-xs font-bold text-slate-800">Doa Setelah Adzan Otomatis</h4>
                             </div>
                             <!-- Toggle Switch -->
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="doaEnabled" class="sr-only peer" onchange="saveSettings()">
-                                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="doaEnabled" onchange="saveSettings()">
+                                <span class="toggle-slider"></span>
                             </label>
                         </div>
                         <p class="text-[11px] text-slate-500">Putar lantunan doa sesudah adzan secara langsung setelah kumandang adzan selesai (jeda otomatis 2 detik).</p>
@@ -1238,9 +1406,9 @@
                                 <h4 class="text-xs font-bold text-slate-800">Manajemen Musik &amp; Bel Sekolah</h4>
                             </div>
                             <!-- Toggle Switch -->
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="playAfterAdzan" class="sr-only peer" onchange="saveSettings()">
-                                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="playAfterAdzan" onchange="saveSettings()">
+                                <span class="toggle-slider"></span>
                             </label>
                         </div>
                         <p class="text-[11px] text-slate-500">Secara otomatis menghentikan sementara (pause) musik latar dan bel masuk/istirahat saat adzan dan ibadah sholat berlangsung.</p>
@@ -1396,6 +1564,45 @@
     </div>
     <button class="w-full py-2.5 mt-5 text-sm font-bold text-white rounded-lg" style="background:#50C878" onclick="saveSchedule()">Simpan Jadwal</button>
 </div></div>
+
+<!-- Modal Import Jadwal Musik -->
+<div class="modal-overlay" id="importScheduleModal">
+    <div class="modal" style="max-width: 440px;">
+        <div class="flex justify-between items-center mb-3">
+            <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <span class="material-symbols-outlined text-emerald-600">file_upload</span>
+                Import Jadwal Musik
+            </h3>
+            <button class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-xl leading-none" onclick="closeModal('importScheduleModal')">&times;</button>
+        </div>
+        <p class="text-xs text-on-surface-variant mb-4">
+            Ditemukan <span id="importScheduleCount" class="font-bold text-emerald-600">0</span> jadwal pada file yang Anda pilih. Pilih metode impor yang diinginkan:
+        </p>
+        <div class="space-y-2.5 mb-5">
+            <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 hover:border-emerald-500 cursor-pointer transition" onclick="applyImportSchedules('merge')">
+                <div class="flex items-center gap-2.5">
+                    <span class="material-symbols-outlined text-emerald-600 text-lg">merge</span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-bold text-slate-900 dark:text-white">Gabungkan (Merge)</p>
+                        <p class="text-[11px] text-slate-500">Tambahkan jadwal baru tanpa menghapus jadwal yang sudah ada saat ini.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/40 hover:border-red-500 cursor-pointer transition" onclick="applyImportSchedules('replace')">
+                <div class="flex items-center gap-2.5">
+                    <span class="material-symbols-outlined text-red-500 text-lg">sync_problem</span>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-bold text-red-600 dark:text-red-400">Gantikan Semua (Replace)</p>
+                        <p class="text-[11px] text-slate-500">Hapus seluruh jadwal saat ini dan ganti sepenuhnya dengan jadwal dari file.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="flex justify-end gap-2">
+            <button class="px-4 py-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition" onclick="closeModal('importScheduleModal')">Batal</button>
+        </div>
+    </div>
+</div>
 
 <div class="modal-overlay" id="userModal"><div class="modal">
     <div class="flex justify-between items-center mb-3"><h3 class="text-sm font-bold" id="userModalTitle">Tambah User</h3><button class="text-lg" onclick="closeModal('userModal')">&times;</button></div>

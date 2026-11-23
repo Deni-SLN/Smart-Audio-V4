@@ -1,12 +1,21 @@
 {
   "name": "musik-pintar",
-  "version": "3.6.0",
+  "version": "3.7.0",
   "description": "Smart Audio Scheduler - Musik Pintar v3.5 PWA",
+  "author": {
+    "name": "Deni S",
+    "email": "deni@musikpintar.local"
+  },
+  "homepage": "https://github.com/deni26/musik-pintar",
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "electron:dev": "vite build && electron .",
+    "build:linux": "npm run build && electron-builder --linux",
+    "build:win": "npm run build && electron-builder --win"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1156.0",
@@ -20,6 +29,8 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
     "tailwindcss": "^4.3.3",
     "vite": "^5.4.0"
   }

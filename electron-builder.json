@@ -1,0 +1,31 @@
+{
+  "appId": "com.musikpintar.app",
+  "productName": "Musik Pintar",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "server/**/*",
+    "electron/**/*",
+    "public/**/*",
+    "package.json"
+  ],
+  "asar": true,
+  "win": {
+    "target": ["zip", "dir"],
+    "icon": "public/icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Musik Pintar"
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "icon": "public/icon-512.png",
+    "category": "AudioVideo"
+  }
+}
