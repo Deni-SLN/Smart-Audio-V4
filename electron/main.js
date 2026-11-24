@@ -3,7 +3,8 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { handleGdrive } from '../server/gdrive-proxy.js';
+
+let handleGdrive = null;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,7 +74,11 @@ function serveStaticFile(req, res, filePath) {
 }
 
 // Jalankan local HTTP server internal
-function startLocalServer() {
+async function startLocalServer() {
+    process.env.GDRIVE_CACHE_DIR = path.join(app.getPath('userData'), 'gdrive-cache');
+    const mod = await import('../server/gdrive-proxy.js');
+    handleGdrive = mod.handleGdrive;
+
     return new Promise((resolve, reject) => {
         server = http.createServer((req, res) => {
             // Tangani API Google Drive streaming & local disk cache
@@ -111,6 +116,66 @@ function getAppIcon() {
     return pngPath;
 }
 
+function getLinuxAutostartPath() {
+    const configHome = process.env.XDG_CONFIG_HOME || path.join(app.getPath('home'), '.config');
+    return path.join(configHome, 'autostart', 'musik-pintar.desktop');
+}
+
+function getAutoStart() {
+    if (process.platform === 'linux') {
+        return fs.existsSync(getLinuxAutostartPath());
+    }
+    return !!app.getLoginItemSettings().openAtLogin;
+}
+
+function setAutoStart(enabled) {
+    try {
+        if (process.platform === 'linux') {
+            const desktopFile = getLinuxAutostartPath();
+            if (enabled) {
+                fs.mkdirSync(path.dirname(desktopFile), { recursive: true });
+                const execPath = process.env.APPIMAGE || app.getPath('exe');
+                const execCmd = app.isPackaged
+                    ? `"${execPath}"`
+                    : `"${execPath}" "${ROOT_DIR}" --no-sandbox`;
+                const content = [
+                    '[Desktop Entry]',
+                    'Type=Application',
+                    'Name=Musik Pintar',
+                    'Comment=Smart Audio Scheduler',
+                    `Exec=${execCmd}`,
+                    `Icon=${path.join(ROOT_DIR, 'public', 'icon-512.png')}`,
+                    'Terminal=false',
+                    'X-GNOME-Autostart-enabled=true'
+                ].join('\n') + '\n';
+                fs.writeFileSync(desktopFile, content, 'utf8');
+            } else if (fs.existsSync(desktopFile)) {
+                fs.unlinkSync(desktopFile);
+            }
+            return true;
+        }
+        app.setLoginItemSettings({
+            openAtLogin: !!enabled,
+            path: app.getPath('exe')
+        });
+        return true;
+    } catch (e) {
+        console.warn('[Electron] Gagal mengatur auto-start:', e.message);
+        return false;
+    }
+}
+
+function ensureDefaultAutoStart() {
+    const flagFile = path.join(app.getPath('userData'), '.autostart-init');
+    if (!fs.existsSync(flagFile)) {
+        setAutoStart(true);
+        try {
+            fs.mkdirSync(path.dirname(flagFile), { recursive: true });
+            fs.writeFileSync(flagFile, new Date().toISOString());
+        } catch {}
+    }
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1240,
@@ -121,6 +186,7 @@ function createWindow() {
         icon: getAppIcon(),
         autoHideMenuBar: true,
         webPreferences: {
+            preload: path.join(__dirname, 'preload.cjs'),
             nodeIntegration: false,
             contextIsolation: true
         }
@@ -157,7 +223,7 @@ function createTray() {
     const icon = nativeImage.createFromPath(iconPath);
     tray = new Tray(icon.resize({ width: 16, height: 16 }));
 
-    const isAutoStart = app.getLoginItemSettings().openAtLogin;
+    const isAutoStart = getAutoStart();
 
     const contextMenu = Menu.buildFromTemplate([
         {
@@ -174,15 +240,12 @@ function createTray() {
             type: 'checkbox',
             checked: isAutoStart,
             click: (menuItem) => {
-                app.setLoginItemSettings({
-                    openAtLogin: menuItem.checked,
-                    path: app.getPath('exe')
-                });
+                setAutoStart(menuItem.checked);
             }
         },
         { type: 'separator' },
         {
-            label: 'Keluar Sepenuhnya',
+            label: 'Shutdown App (Matikan Sepenuhnya)',
             click: () => {
                 isQuitting = true;
                 app.quit();
@@ -218,6 +281,14 @@ if (!gotTheLock) {
     });
 
     app.whenReady().then(async () => {
+        ensureDefaultAutoStart();
+        ipcMain.handle('app-shutdown', () => {
+            isQuitting = true;
+            app.quit();
+        });
+        ipcMain.handle('get-autostart', () => getAutoStart());
+        ipcMain.handle('set-autostart', (_ev, enabled) => setAutoStart(enabled));
+
         await startLocalServer();
         createWindow();
         createTray();

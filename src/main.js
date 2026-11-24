@@ -273,6 +273,14 @@ function onLoginSuccess(){
 }
 
 async function logout(){
+    if(isDesktopMode){
+        if(!confirm('Matikan aplikasi Musik Pintar sepenuhnya?\n(Musik & jadwal otomatis akan berhenti hingga aplikasi dibuka kembali)')) return;
+        try{ audio.pause(); }catch{}
+        if(window.electronAPI?.shutdownApp){
+            await window.electronAPI.shutdownApp();
+        }
+        return;
+    }
     try{bcStopAdminRealtime()}catch(e){}
     try{hsStopHostSession()}catch(e){}
     currentUser=null;LS.del('currentUser');
@@ -292,10 +300,34 @@ window.logout=logout;
 function updateUI(){
     if(!currentUser)return;
     $('sidebarUserName').textContent=currentUser.name||currentUser.email||'User';
-    $('sidebarUserRole').textContent=currentUser.role==='admin'?'Administrator':'User';
+    $('sidebarUserRole').textContent=isDesktopMode?'Database Lokal':(currentUser.role==='admin'?'Administrator':'User');
     $('sidebarAvatar').textContent=(currentUser.name||currentUser.email||'U').substring(0,2).toUpperCase();
-    $('navAdmin').style.display=currentUser.role==='admin'?'':'none';
+    $('navAdmin').style.display=(!isDesktopMode&&currentUser.role==='admin')?'':'none';
+    if($('navBroadcast'))$('navBroadcast').style.display=isDesktopMode?'none':'';
+    const eb=$('editDesktopNameBtn');
+    if(eb){eb.classList.toggle('hidden',!isDesktopMode);eb.classList.toggle('inline-flex',isDesktopMode);}
+    if($('onlineUrlCard'))$('onlineUrlCard').style.display=isDesktopMode?'none':'';
+    const otb=$('libTabOnlineBtn');
+    if(otb&&isDesktopMode)otb.innerHTML='<span class="material-symbols-outlined text-[15px]">drive_file_move</span><span>Google Drive</span>';
 }
+function openRenameDesktopModal(){
+    if(!isDesktopMode||!currentUser)return;
+    const inp=$('renameDesktopInput');
+    if(inp){inp.value=currentUser.name||'';setTimeout(()=>inp.focus(),50);}
+    $('renameDesktopModal')?.classList.add('active');
+}
+window.openRenameDesktopModal=openRenameDesktopModal;
+function saveDesktopName(){
+    const val=($('renameDesktopInput')?.value||'').trim();
+    if(!val){toast('Nama tidak boleh kosong');return;}
+    currentUser.name=val;
+    LS.set('currentUser',currentUser);
+    updateUI();
+    updateClock();
+    closeModal('renameDesktopModal');
+    toast('Nama profil diubah menjadi: '+val);
+}
+window.saveDesktopName=saveDesktopName;
 
 // ========== DATA SYNC ==========
 async function syncData(){
@@ -395,6 +427,9 @@ async function syncData(){
         settings=LS.get('settings_'+currentUser.id,settings);
         try{ migrateAdzanSettings(); }catch(e){}
         try{ refreshLocationDisplays(); }catch(e){}
+        if(!LS.get('site_loc_saved', null)){
+            detectLocationByIP().catch(()=>{});
+        }
         await updateAdzanAvailability();
         ensureTrackDurations();
     }
@@ -639,8 +674,15 @@ window.toggleMobileMenu=open=>{
 };
 
 // ========== CLOCK ==========
+let _lastClockDay = new Date().toDateString();
 function updateClock(){
     const now=new Date();
+    const dayStr=now.toDateString();
+    if(dayStr!==_lastClockDay){
+        _lastClockDay=dayStr;
+        adzanPlayedToday={};manualPauseKey=null;silencedUntil=0;
+        try{LS.set('adzanDay',dayStr);LS.set('adzanPlayed',adzanPlayedToday);}catch{}
+    }
     const hh=String(now.getHours()).padStart(2,'0'), mm=String(now.getMinutes()).padStart(2,'0'), ss=String(now.getSeconds()).padStart(2,'0');
     // Top panel jam sudah dihapus per permintaan user (17.42.47 Sel, 1 Sep) — biarkan jika elemen masih ada (backward compat)
     const hc=$('headerClock');if(hc)hc.innerHTML=`${hh}:${mm}<span style="font-size:0.7em;opacity:0.6">.${ss}</span>`;
@@ -653,8 +695,8 @@ function updateClock(){
     const h=now.getHours();let g='Selamat Datang';if(h>=4&&h<12)g='Selamat Pagi';else if(h>=12&&h<17)g='Selamat Siang';else if(h>=17&&h<20)g='Selamat Sore';else g='Selamat Malam';
     const gt=$('greetingText');if(gt)gt.textContent=`${g}, ${currentUser?.name||''}`;
     const hi=$('hijriDate');if(hi){const hd2=gregorianToHijri(now.getFullYear(),now.getMonth()+1,now.getDate());hi.textContent=`${hd2.day} ${HIJRI_M[hd2.month-1]} ${hd2.year} H`;}
-    const ct=$('connectionText');if(ct)ct.textContent=navigator.onLine?'Online':'Offline';
-    const cb=$('connectionBadge');if(cb){const ic=cb.querySelector('.material-symbols-outlined');if(ic)ic.textContent=navigator.onLine?'cloud_done':'cloud_off';}
+    const ct=$('connectionText');if(ct)ct.textContent=isDesktopMode?'Database Lokal':(navigator.onLine?'Online':'Offline');
+    const cb=$('connectionBadge');if(cb){const ic=cb.querySelector('.material-symbols-outlined');if(ic)ic.textContent=isDesktopMode?'storage':(navigator.onLine?'cloud_done':'cloud_off');}
     checkAutoPlay(now);
     enforceScheduleWindows(now);
     checkPrayerTime(now);
@@ -988,45 +1030,62 @@ function resetSholatOffsets(){
 }
 window.resetSholatOffsets = resetSholatOffsets;
 
-function openCityPicker(){
-    const cities = [
-        { name: 'Jakarta (DKI)', lat: -6.2088, lng: 106.8456 },
-        { name: 'Bogor (Kota/Kab)', lat: -6.5950, lng: 106.8166 },
-        { name: 'Depok (Jawa Barat)', lat: -6.4025, lng: 106.7942 },
-        { name: 'Tangerang (Banten)', lat: -6.1783, lng: 106.6319 },
-        { name: 'Bekasi (Jawa Barat)', lat: -6.2383, lng: 106.9756 },
-        { name: 'Bandung (Jawa Barat)', lat: -6.9175, lng: 107.6191 },
-        { name: 'Semarang (Jawa Tengah)', lat: -6.9667, lng: 110.4167 },
-        { name: 'Yogyakarta (DIY)', lat: -7.7956, lng: 110.3695 },
-        { name: 'Surabaya (Jawa Timur)', lat: -7.2575, lng: 112.7521 },
-        { name: 'Medan (Sumatera Utara)', lat: 3.5952, lng: 98.6722 },
-        { name: 'Palembang (Sumatera Selatan)', lat: -2.9761, lng: 104.7754 },
-        { name: 'Makassar (Sulawesi Selatan)', lat: -5.1477, lng: 119.4327 },
-        { name: 'Denpasar (Bali)', lat: -8.6705, lng: 115.2126 },
-        { name: 'Banjarmasin (Kalimantan Selatan)', lat: -3.3194, lng: 114.5908 },
-        { name: 'Balikpapan (Kalimantan Timur)', lat: -1.2379, lng: 116.8529 },
-    ];
-    const opts = cities.map((c, i) => `${i+1}. ${c.name}`).join('\n');
-    const input = prompt('Pilih nomor kota untuk koordinat otomatis:\n' + opts);
-    if(!input) return;
-    const idx = parseInt(input) - 1;
-    if(idx >= 0 && idx < cities.length){
-        const c = cities[idx];
-        settings.lat = c.lat;
-        settings.lng = c.lng;
-        if($('latInput')) $('latInput').value = c.lat;
-        if($('lngInput')) $('lngInput').value = c.lng;
-        try { LS.set('locationName', c.name); LS.set('site_loc_name', c.name); } catch(e){}
-        prayerTimes = calcPrayerTimes(settings.lat, settings.lng);
-        saveLocal();
-        saveSiteLocationNow();
-        saveUserSettingsNow();
-        renderPrayerGrid();
-        refreshLocationDisplays();
-        toast('Lokasi diatur ke: ' + c.name);
-    } else {
-        toast('Pilihan nomor tidak valid');
+const PRESET_CITIES = [
+    { name: 'Depok (Jawa Barat)', lat: -6.4025, lng: 106.7942 },
+    { name: 'Jakarta (DKI)', lat: -6.2088, lng: 106.8456 },
+    { name: 'Bogor (Kota/Kab)', lat: -6.5950, lng: 106.8166 },
+    { name: 'Tangerang (Banten)', lat: -6.1783, lng: 106.6319 },
+    { name: 'Bekasi (Jawa Barat)', lat: -6.2383, lng: 106.9756 },
+    { name: 'Bandung (Jawa Barat)', lat: -6.9175, lng: 107.6191 },
+    { name: 'Semarang (Jawa Tengah)', lat: -6.9667, lng: 110.4167 },
+    { name: 'Yogyakarta (DIY)', lat: -7.7956, lng: 110.3695 },
+    { name: 'Surabaya (Jawa Timur)', lat: -7.2575, lng: 112.7521 },
+    { name: 'Medan (Sumatera Utara)', lat: 3.5952, lng: 98.6722 },
+    { name: 'Palembang (Sumatera Selatan)', lat: -2.9761, lng: 104.7754 },
+    { name: 'Makassar (Sulawesi Selatan)', lat: -5.1477, lng: 119.4327 },
+    { name: 'Denpasar (Bali)', lat: -8.6705, lng: 115.2126 },
+    { name: 'Banjarmasin (Kalimantan Selatan)', lat: -3.3194, lng: 114.5908 },
+    { name: 'Balikpapan (Kalimantan Timur)', lat: -1.2379, lng: 116.8529 }
+];
+function selectPresetCity(idx){
+    const c = PRESET_CITIES[idx];
+    if(!c) return;
+    settings.lat = c.lat;
+    settings.lng = c.lng;
+    if($('latInput')) $('latInput').value = c.lat;
+    if($('lngInput')) $('lngInput').value = c.lng;
+    try { LS.set('site_loc_saved', {lat: c.lat, lng: c.lng, t: Date.now()}); LS.set('locationName', c.name); LS.set('site_loc_name', c.name); } catch(e){}
+    prayerTimes = calcPrayerTimes(settings.lat, settings.lng);
+    saveLocal();
+    saveSiteLocationNow();
+    saveUserSettingsNow();
+    renderPrayerGrid();
+    refreshLocationDisplays();
+    closeModal('cityPickerModal');
+    toast('Lokasi diatur ke: ' + c.name);
+}
+window.selectPresetCity = selectPresetCity;
+function filterCityPicker(q){
+    const list = $('cityPickerList');
+    if(!list) return;
+    const kw = (q || '').trim().toLowerCase();
+    const items = PRESET_CITIES.map((c, idx) => ({ ...c, idx })).filter(c => !kw || c.name.toLowerCase().includes(kw));
+    if(!items.length){
+        list.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Kota tidak ditemukan</p>';
+        return;
     }
+    list.innerHTML = items.map(c => `
+        <button type="button" class="w-full text-left px-3.5 py-2.5 rounded-xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/50 transition flex items-center justify-between gap-2" onclick="selectPresetCity(${c.idx})">
+            <span class="text-xs font-semibold text-slate-800">${c.name}</span>
+            <span class="text-[10px] font-mono text-slate-400">${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}</span>
+        </button>
+    `).join('');
+}
+window.filterCityPicker = filterCityPicker;
+function openCityPicker(){
+    if($('citySearchInput')) $('citySearchInput').value = '';
+    filterCityPicker('');
+    $('cityPickerModal')?.classList.add('active');
 }
 window.openCityPicker = openCityPicker;
 
@@ -1192,7 +1251,7 @@ async function resolveAdzanSrc(kind){return(await resolveAdzan(kind)).src}
 //   Loop ON      -> putar loop dan berhenti TEPAT pukul "Jam Selesai" (mis. 07:45-09:59 -> stop 09:59)
 // Semua skenario tetap berhenti 5 menit sebelum adzan (ditangani checkPrayerTime).
 function enforceScheduleWindows(now){
-    if(!isPlaying||!activeScheduleId)return;
+    if(!activeScheduleId)return;
     const s=schedules.find(x=>x.id===activeScheduleId);
     if(!s)return;
     // 1x: jangan paksa stop berdasarkan jam — biarkan lagu selesai natural via audio.onended -> nextTrack().
@@ -1202,11 +1261,12 @@ function enforceScheduleWindows(now){
     const win=scheduleWindow(s);
     if(s.enabled&&s.days.includes(td)&&nm>=win.sM&&nm<win.eM)return;
     const title=s.title||'Jadwal';
+    const wasPlaying=isPlaying;
     pausedPosition=0;audio.pause();isPlaying=false;
     activeScheduleId=null;loopPlaylist=false;stopAfterPlaylist=false;stopAfterCurrentSong=false;
     currentPlaylist=[];currentPlaylistIndex=-1;
     updatePlayPauseBtn();renderTracks();renderUpacaras();
-    toast('⏰ Jam selesai — "'+title+'" dihentikan otomatis');
+    if(wasPlaying)toast('⏰ Jam selesai — "'+title+'" dihentikan otomatis');
 }
 
 function updateAdzanStatus(){
@@ -1722,6 +1782,39 @@ function playAllTracks(){const ut=getUserAudios().filter(x=>x._localAvailable!==
 window.playAllTracks=playAllTracks;
 
 // ========== PLAYER ==========
+let _autoplayBlocked = false;
+function _handlePlayPromise(p){
+    if(p && typeof p.then === 'function'){
+        p.then(()=>{
+            _autoplayBlocked = false;
+            isPlaying = true;
+            updatePlayPauseBtn();
+        }).catch(err=>{
+            console.warn('audio.play() gagal:', err?.name, err?.message);
+            isPlaying = false;
+            if(err?.name === 'NotAllowedError'){
+                _autoplayBlocked = true;
+                toast('Klik di mana saja pada halaman untuk mengaktifkan audio otomatis');
+            }
+            updatePlayPauseBtn();
+        });
+    }
+}
+// Buka kunci audio otomatis jika sebelumnya terblokir Autoplay Policy browser
+['click','keydown','touchstart'].forEach(ev=>{
+    window.addEventListener(ev, ()=>{
+        if(_autoplayBlocked){
+            _autoplayBlocked = false;
+            if(currentPlaylist.length && currentPlaylistIndex >= 0 && audio.paused){
+                _handlePlayPromise(audio.play());
+            } else {
+                // Unlock audio context ringan
+                try{ audio.play().then(()=>audio.pause()).catch(()=>{}); }catch{}
+            }
+        }
+    }, { passive: true });
+});
+
 function loadAndPlay(resumePos){
     if(currentPlaylistIndex<0||currentPlaylistIndex>=currentPlaylist.length)return;
     const t=currentPlaylist[currentPlaylistIndex];
@@ -1737,8 +1830,8 @@ function loadAndPlay(resumePos){
             if(isNeonConfigured()){try{getNeonClient().from('tracks').update({duration:cur.duration}).eq('id',cur.id)}catch(e){}}
         }
     };
-    audio.play().catch(()=>{});
     isPlaying=true;
+    _handlePlayPromise(audio.play());
     updatePlayPauseBtn();renderTracks();renderUpacaras();
 }
 function resumePlaying(){
@@ -1749,8 +1842,8 @@ function resumePlaying(){
     audio.src=normalizeGdrive(t.src);
     audio.volume=(activeScheduleVolumePct/100)*(t.volume||100)/100*(settings.volume/100);
     audio.onloadedmetadata=()=>{if(pausedPosition>0&&pausedPosition<audio.duration){audio.currentTime=pausedPosition}};
-    audio.play().catch(()=>{});
     isPlaying=true;
+    _handlePlayPromise(audio.play());
     updatePlayPauseBtn();renderTracks();renderUpacaras();
 }
 function togglePlayPause(){
@@ -1995,13 +2088,31 @@ window.savePlaylist=savePlaylist;
 function renderPlaylists(){
     const c=$('playlistList');
     const up=currentUser?.role==='admin'?playlists:playlists.filter(p=>p.owner===currentUser.id);
-    if(!up.length){c.innerHTML='<div class="glass-card rounded-xl p-6 text-center text-on-surface-variant"><p class="text-xs">Belum ada playlist</p></div>';return}
+    if(!up.length){c.innerHTML='<div class="glass-card rounded-xl p-8 text-center text-on-surface-variant"><span class="material-symbols-outlined text-3xl text-slate-300 mb-1">queue_music</span><p class="text-xs font-medium">Belum ada playlist. Klik "+ Buat Playlist" untuk memulai.</p></div>';return}
     c.innerHTML=up.map(p=>{
-        const tn=p.track_ids.map(id=>tracks.find(t=>t.id===id)?.name||'?').join(', ');
-        return`<div class="glass-card rounded-xl p-4"><div class="flex justify-between items-center mb-2"><h3 class="text-sm font-bold">${p.name}</h3><span class="text-[11px] text-on-surface-variant">${p.track_ids.length} lagu</span></div><p class="text-[11px] text-on-surface-variant mb-2 truncate">${tn}</p><div class="flex gap-1.5"><button class="text-[11px] font-bold px-2.5 py-1 rounded text-white" style="background:#50C878" onclick="playPlaylist('${p.id}')">Putar</button><button class="text-[11px] px-2.5 py-1 rounded border border-outline-variant" onclick="openPlaylistModal('${p.id}')">Edit</button><button class="text-[11px] px-2.5 py-1 rounded border border-red-300 text-red-500" onclick="removePlaylist('${p.id}')">Hapus</button></div></div>`;
+        const tn=p.track_ids.map(id=>tracks.find(t=>t.id===id)?.name||'?').join(', ') || 'Belum ada lagu';
+        return`<div class="glass-card rounded-xl p-3.5 sm:p-4 hover:border-slate-300 transition-colors">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[20px]">queue_music</span></div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm font-bold text-slate-900 truncate">${p.name}</h3>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold shrink-0">${p.track_ids.length} lagu</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant truncate mt-0.5">${tn}</p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100 sm:pt-0 sm:border-t-0 shrink-0">
+                    <button class="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg text-white hover:opacity-95 transition" style="background:#50C878" onclick="playPlaylist('${p.id}')"><span class="material-symbols-outlined text-[15px]">play_arrow</span>Putar</button>
+                    <button class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition" onclick="openPlaylistModal('${p.id}')"><span class="material-symbols-outlined text-[14px]">edit</span>Edit</button>
+                    <button class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition" onclick="removePlaylist('${p.id}')"><span class="material-symbols-outlined text-[14px]">delete</span>Hapus</button>
+                </div>
+            </div>
+        </div>`;
     }).join('');
 }
-function playPlaylist(id){const p=playlists.find(p=>p.id===id);if(!p)return;const plTracks=p.track_ids.map(id=>tracks.find(t=>t.id===id)).filter(Boolean).filter(x=>x.type==='online'||x._localAvailable!==false);if(!plTracks.length){toast('Kosong / file lokal tidak tersedia');return}isLibraryPlaying=false;stopAfterPlaylist=false;loopPlaylist=false;stopAfterCurrentSong=false;activeScheduleId=null;manualPauseKey=null;activeScheduleVolumePct=100;manualOverrideUntil=Date.now()+7200000;currentPlaylist=settings.shuffle?[...plTracks].sort(()=>Math.random()-.5):[...plTracks];currentPlaylistIndex=0;loadAndPlay();toast('Putar: '+p.name)}
+function playPlaylist(id){const p=playlists.find(p=>p.id===id);if(!p)return;const plTracks=p.track_ids.map(id=>tracks.find(t=>t.id===id)).filter(Boolean).filter(x=>x.type==='online'||x.type==='gdrive'||x._localAvailable!==false);if(!plTracks.length){toast('Kosong / file lokal tidak tersedia');return}isLibraryPlaying=false;stopAfterPlaylist=false;loopPlaylist=false;stopAfterCurrentSong=false;activeScheduleId=null;manualPauseKey=null;activeScheduleVolumePct=100;manualOverrideUntil=Date.now()+7200000;currentPlaylist=settings.shuffle?[...plTracks].sort(()=>Math.random()-.5):[...plTracks];currentPlaylistIndex=0;loadAndPlay();toast('Putar: '+p.name)}
 window.playPlaylist=playPlaylist;
 async function removePlaylist(id){if(!confirm('Hapus?'))return;playlists=playlists.filter(p=>p.id!==id);saveLocal();renderPlaylists();toast('Dihapus')}
 window.removePlaylist=removePlaylist;
@@ -2138,15 +2249,24 @@ function renderUpacaras(){
         return;
     }
     const uu=currentUser?.role==='admin'?upacaras:upacaras.filter(u=>u.owner===currentUser.id);
-    if(!uu.length){c.innerHTML='<div class="glass-card rounded-xl p-6 text-center text-on-surface-variant"><p class="text-xs">Belum ada upacara. Klik "+ Buat Upacara", lalu klik kartu untuk masuk dan menambah lagu.</p></div>';return}
+    if(!uu.length){c.innerHTML='<div class="glass-card rounded-xl p-8 text-center text-on-surface-variant"><span class="material-symbols-outlined text-3xl text-slate-300 mb-1">event</span><p class="text-xs font-medium">Belum ada upacara. Klik "+ Buat Upacara", lalu klik kartu untuk menambah lagu.</p></div>';return}
     c.innerHTML=uu.map(u=>{
         const n=u.track_ids.length;
-        return`<div class="glass-card rounded-xl p-4 cursor-pointer hover:shadow-md transition" onclick="openUpacara('${u.id}')">
-            <div class="flex justify-between items-center">
-                <div><h3 class="text-sm font-bold">${u.name}</h3><p class="text-[11px] text-on-surface-variant">${n} lagu • 1x putar</p></div>
-                <div class="flex gap-1.5" onclick="event.stopPropagation()">
-                    <button class="text-[11px] px-2.5 py-1 rounded border border-outline-variant" onclick="openUpacaraModal('${u.id}')">Edit</button>
-                    <button class="text-[11px] px-2.5 py-1 rounded border border-red-300 text-red-500" onclick="removeUpacara('${u.id}')">Hapus</button>
+        return`<div class="glass-card rounded-xl p-3.5 sm:p-4 cursor-pointer hover:border-slate-300 transition-colors" onclick="openUpacara('${u.id}')">
+            <div class="flex justify-between items-center gap-3">
+                <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                    <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-[20px]">event</span></div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm font-bold text-slate-900 truncate">${u.name}</h3>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold shrink-0">${n} lagu</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant mt-0.5">Putar 1x berurutan &bull; Klik kartu untuk kelola lagu</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 shrink-0" onclick="event.stopPropagation()">
+                    <button class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition" onclick="openUpacaraModal('${u.id}')"><span class="material-symbols-outlined text-[14px]">edit</span>Edit</button>
+                    <button class="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition" onclick="removeUpacara('${u.id}')"><span class="material-symbols-outlined text-[14px]">delete</span>Hapus</button>
                 </div>
             </div>
         </div>`;
@@ -2561,19 +2681,20 @@ function checkAutoPlay(now){
         if(nm<win.sM||nm>=win.eM)continue;
         // Jangan lanjut otomatis jika pengguna menjeda jadwal ini secara manual hari ini
         if(manualPauseKey&&manualPauseKey===schedPauseKey(s))continue;
-        if(!isPlaying||!currentPlaylist.length){
+        // Jika sedang tidak memutar (atau jadwal berganti ke jadwal baru setelah Ashar/jeda)
+        if(!isPlaying||!currentPlaylist.length||(activeScheduleId&&activeScheduleId!==s.id&&!isLibraryPlaying&&Date.now()>manualOverrideUntil)){
             let sourceTracks=[];
-            if(s.source_type==='single'){const t=tracks.find(t=>t.id===s.source_id);if(t&&(t.type==='online'||t._localAvailable!==false))sourceTracks=[t]}
-            else if(s.source_type==='playlist'){const p=playlists.find(p=>p.id===s.source_id);if(p)sourceTracks=p.track_ids.map(id=>tracks.find(t=>t.id===id)).filter(Boolean).filter(x=>x.type==='online'||x._localAvailable!==false)}
-            else{const u=upacaras.find(u=>u.id===s.source_id);if(u)sourceTracks=u.track_ids.map(id=>tracks.find(t=>t.id===id)).filter(Boolean).filter(x=>x.type==='online'||x._localAvailable!==false)}
+            if(s.source_type==='single'){const t=tracks.find(t=>t.id===s.source_id);if(t&&(t.type==='online'||t.type==='gdrive'||t._localAvailable!==false))sourceTracks=[t]}
+            else if(s.source_type==='playlist'){const p=playlists.find(p=>p.id===s.source_id);if(p)sourceTracks=p.track_ids.map(id=>tracks.find(t=>t.id===id)).filter(Boolean).filter(x=>x.type==='online'||x.type==='gdrive'||x._localAvailable!==false)}
+            else{const u=upacaras.find(u=>u.id===s.source_id);if(u)sourceTracks=u.track_ids.map(id=>tracks.find(t=>t.id===id)).filter(Boolean).filter(x=>x.type==='online'||x.type==='gdrive'||x._localAvailable!==false)}
             if(sourceTracks.length){
+                const isSameSched = (activeScheduleId === s.id);
+                if(!isSameSched) pausedPosition = 0;
                 currentPlaylist=s.loop?(settings.shuffle?[...sourceTracks].sort(()=>Math.random()-.5):sourceTracks):sourceTracks;
                 isLibraryPlaying=false;loopPlaylist=!!s.loop;stopAfterPlaylist=!s.loop;stopAfterCurrentSong=false;activeScheduleId=s.id;activeScheduleVolumePct=(typeof s.volume==='number'?s.volume:100);
-                if(!isPlaying){
-                    manualPauseKey=null;
-                    if(pausedPosition>0){resumePlaying();toast('Lanjut: '+s.title)}
-                    else{currentPlaylistIndex=0;loadAndPlay();toast('Auto: '+s.title)}
-                }
+                manualPauseKey=null;
+                if(isSameSched && pausedPosition>0){resumePlaying();toast('Lanjut: '+s.title)}
+                else{currentPlaylistIndex=0;loadAndPlay();toast('Auto: '+s.title)}
             }
         }
         return;
@@ -2784,8 +2905,18 @@ window.seekDash=seekDash;
 window.playScheduleNow=playScheduleNow;
 
 // ========== INIT ==========
-const savedUser=LS.get('currentUser',null);
+const isDesktopMode = typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent);
+const savedUser = LS.get('currentUser', null) || (isDesktopMode ? { id: 'local-desktop', name: 'Desktop Lokal', username: 'local', role: 'admin', storage_limit: 0 } : null);
 if(savedUser){
+    if(isDesktopMode){
+        LS.set('currentUser', savedUser);
+        const lb=$('sidebarLogoutBtn');
+        if(lb){
+            lb.className='flex items-center gap-3 px-3 py-2.5 text-red-600 hover:bg-red-50 rounded-lg transition-all text-sm font-semibold';
+            lb.innerHTML='<span class="material-symbols-outlined text-[20px]">power_settings_new</span>Shutdown App';
+            lb.title='Matikan aplikasi sepenuhnya';
+        }
+    }
     currentUser=savedUser;
     $('loginPage').style.display='none';
     $('appPage').style.display='';
@@ -2836,7 +2967,38 @@ try{
         location.reload();
     }, delay);
 })();
-setInterval(updateClock,1000);updateClock();
+// Gunakan Web Worker ticker agar timer tidak di-throttle browser saat tab di-minimize / background
+(function startReliableTicker(){
+    let workerStarted = false;
+    try {
+        const blob = new Blob(['setInterval(() => postMessage(1), 1000);'], { type: 'application/javascript' });
+        const w = new Worker(URL.createObjectURL(blob));
+        w.onmessage = () => updateClock();
+        workerStarted = true;
+    } catch (e) {}
+    if (!workerStarted) {
+        setInterval(updateClock, 1000);
+    }
+    updateClock();
+})();
+
+// Jaga layar/tab tetap aktif (Screen Wake Lock) selama aplikasi terbuka
+let _wakeLock = null;
+async function requestAppWakeLock(){
+    try {
+        if ('wakeLock' in navigator && document.visibilityState === 'visible' && !_wakeLock) {
+            _wakeLock = await navigator.wakeLock.request('screen');
+            _wakeLock.addEventListener('release', () => { _wakeLock = null; });
+        }
+    } catch (e) {}
+}
+requestAppWakeLock();
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        requestAppWakeLock();
+        updateClock();
+    }
+});
 document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('active')}));
 const today=new Date().toDateString();if(LS.get('adzanDay','')!==today){adzanPlayedToday={};LS.set('adzanDay',today);LS.set('adzanPlayed',adzanPlayedToday)}
 // ========== PWA SETUP & INSTALL PROMPT ==========

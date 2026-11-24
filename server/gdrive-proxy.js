@@ -12,7 +12,7 @@ import path from 'node:path';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 const PASS_HEADERS = ['content-type', 'content-length', 'content-range', 'accept-ranges', 'last-modified', 'etag'];
 
-const CACHE_DIR = path.resolve(process.cwd(), 'data/gdrive-cache');
+const CACHE_DIR = process.env.GDRIVE_CACHE_DIR || path.resolve(process.cwd(), 'data/gdrive-cache');
 if (!fs.existsSync(CACHE_DIR)) {
     try { fs.mkdirSync(CACHE_DIR, { recursive: true }); } catch (e) {}
 } else {

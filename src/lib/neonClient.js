@@ -16,7 +16,12 @@ export function getNeonClient() {
     return client;
 }
 
+export function isDesktopApp() {
+    return typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent);
+}
+
 export function isNeonConfigured() {
+    if (isDesktopApp()) return false;
     return !!(authUrl && dataApiUrl);
 }
 
