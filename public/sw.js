@@ -1,4 +1,4 @@
-const CACHE_NAME = 'musik-pintar-v9';
+const CACHE_NAME = 'musik-pintar-v10';
 const AUDIO_CACHE = 'musik-pintar-audio-v4';
 
 // Install
