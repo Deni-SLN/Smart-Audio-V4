@@ -2356,8 +2356,8 @@ function openScheduleModal(id){
     $('scheduleModalTitle').textContent=id?'Edit Jadwal Musik':'Tambah Jadwal Musik';
     const s=id?schedules.find(s=>s.id===id):null;
     $('scheduleTitle').value=s?.title||'';
-    $('scheduleStart').value=s?.start_time||'08:00';
-    $('scheduleEnd').value=s?.end_time||'17:00';
+    $('scheduleStart').value=(s?.start_time||'08:00').slice(0,5);
+    $('scheduleEnd').value=(s?.end_time||'17:00').slice(0,5);
     $('scheduleLoop').checked=s?.loop??true;
     const svol=typeof s?.volume==='number'?s.volume:100;
     volSetValue('schedModal',svol);
@@ -2394,6 +2394,14 @@ function updateScheduleLoopUI(){
     updateScheduleDurationInfo();
 }
 window.updateScheduleLoopUI=updateScheduleLoopUI;
+function formatExactEndTime(startTimeStr, durSec){
+    const [sh, sm] = (startTimeStr || '00:00').split(':').map(Number);
+    const totalSec = (sh * 3600) + (sm * 60) + Math.round(durSec || 0);
+    const eh = Math.floor(totalSec / 3600) % 24;
+    const em = Math.floor((totalSec % 3600) / 60);
+    const es = totalSec % 60;
+    return `${String(eh).padStart(2,'0')}:${String(em).padStart(2,'0')}:${String(es).padStart(2,'0')}`;
+}
 function updateScheduleDurationInfo(){
     const info=$('scheduleDurationInfo');if(!info)return;
     if(!$('scheduleLoop')||$('scheduleLoop').checked){info.textContent='Loop aktif — musik diulang hingga Jam Selesai.';info.style.color='';return}
@@ -2408,12 +2416,9 @@ function updateScheduleDurationInfo(){
         ensureTrackDurations();
         return;
     }
-    const[sh,sm]=($('scheduleStart').value||'00:00').split(':').map(Number);
-    // dur dalam DETIK -> konversi ke menit sebelum dijumlahkan ke jam mulai
-    const durMin=Math.max(Math.round(dur/60),1);
-    const total=sh*60+sm+durMin;
-    const eh=Math.floor(total/60)%24,em=total%60;
-    let txt=`Durasi ${formatTime(dur)} • Selesai ${String(eh).padStart(2,'0')}:${String(em).padStart(2,'0')}`;
+    const startStr = $('scheduleStart').value || '00:00';
+    const exactEnd = formatExactEndTime(startStr, dur);
+    let txt=`Durasi ${formatTime(dur)} • Mulai ${startStr} → Selesai ${exactEnd} (1x tepat lagu)`;
     if(unknown>0){txt+=` (+${unknown} durasi belum diketahui)`;info.style.color='#d97706';ensureTrackDurations()}
     else info.style.color='';
     info.textContent=txt;
@@ -2427,11 +2432,9 @@ async function saveSchedule(){
     const loop=$('scheduleLoop').checked;
     let endT=$('scheduleEnd').value;
     if(!loop){
-        // Tanpa loop: hitung perkiraan jam berhenti dari durasi musik (otomatis berhenti saat musik selesai)
-        const[sh2,sm2]=(startT||'00:00').split(':').map(Number);
-        const total=sh2*60+sm2+Math.max(Math.round(computeSourceDuration(type,sid)/60),1);
-        const eh2=Math.floor(total/60)%24,em2=total%60;
-        endT=`${String(eh2).padStart(2,'0')}:${String(em2).padStart(2,'0')}`;
+        // Tanpa loop: hitung jam selesai persis ke detik dari durasi lagu (tanpa pembulatan)
+        const dur=computeSourceDuration(type,sid);
+        endT=dur>0?formatExactEndTime(startT,dur):startT;
     }
     const data={title,start_time:startT,end_time:endT,days,source_type:type,source_id:sid,loop,volume:volValue('schedModal'),enabled:true,owner:currentUser.id};
     if(editingId){
@@ -2472,15 +2475,18 @@ function renderSchedules(){
         const vol = typeof s.volume==='number'?s.volume:100;
         const durSec = computeSourceDuration(s.source_type,s.source_id);
         const durStr = durSec>0 ? formatTime(durSec) : '—';
+        const exactEnd = (s.loop===false && durSec>0) ? formatExactEndTime(s.start_time, durSec) : null;
         const winDur = (()=>{ if(s.loop===false) return durStr; const[sh,sm]=s.start_time.split(':').map(Number); const[eh,em]=s.end_time.split(':').map(Number); const m=(eh*60+em)-(sh*60+sm); return m>0?`${Math.floor(m/60)}j ${m%60}m`:`${m}m`; })();
         const durLabel = s.loop===false ? durStr : `${durStr} • ${winDur}`;
-        const timeSub = s.loop===false ? '1x' : s.end_time;
-        const modeDesc = s.loop===false ? 'Berhenti saat musik selesai' : `Loop s.d. ${s.end_time}`;
+        const timeSub = s.loop===false ? (exactEnd || '1x') : s.end_time;
+        const timeIndicator = s.loop===false
+            ? (exactEnd ? `Mulai ${s.start_time} → Selesai ${exactEnd} (1x)` : `Mulai ${s.start_time} • Selesai saat musik habis (1x)`)
+            : `Mulai ${s.start_time} → Selesai ${s.end_time} (Loop)`;
         const borderAccent = active ? 'border-l-4 border-l-emerald-500' : (!s.enabled ? 'opacity-70' : '');
         return`<div class="glass-card rounded-xl p-3.5 sm:p-4 hover:border-slate-300 transition-colors ${borderAccent}">
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
                 <div class="flex items-start gap-3.5 min-w-0 flex-1">
-                    <div class="shrink-0 w-16 rounded-xl bg-slate-50 border border-slate-200/80 px-2 py-2 text-center tabular-nums">
+                    <div class="shrink-0 w-20 rounded-xl bg-slate-50 border border-slate-200/80 px-2 py-2 text-center tabular-nums">
                         <div class="text-sm font-bold text-slate-900 leading-tight">${s.start_time}</div>
                         <div class="text-[10px] font-medium text-slate-500 mt-0.5">${timeSub}</div>
                     </div>
@@ -2489,7 +2495,7 @@ function renderSchedules(){
                             <h4 class="text-sm font-bold text-slate-900 truncate">${s.title}</h4>
                             <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${sc} shrink-0">${st}</span>
                         </div>
-                        <p class="text-xs text-on-surface-variant truncate mt-0.5">${sourceName} <span class="text-slate-300 mx-1">&bull;</span> ${modeDesc}</p>
+                        <p class="text-xs text-on-surface-variant truncate mt-0.5">${sourceName} <span class="text-slate-300 mx-1">&bull;</span> <span class="font-medium text-slate-700">${timeIndicator}</span></p>
                         <div class="flex flex-wrap items-center gap-1.5 mt-2.5">
                             <span class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-slate-900 text-white font-semibold shrink-0"><span class="material-symbols-outlined text-[12px]">volume_up</span> ${vol}%</span>
                             <span class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold shrink-0"><span class="material-symbols-outlined text-[12px]">schedule</span> ${durLabel}</span>
@@ -2666,7 +2672,7 @@ window.toggleAutoPlay=toggleAutoPlay;
 function scheduleWindow(s){
     const[sh,sm]=(s.start_time||'00:00').split(':').map(Number),sM=sh*60+sm;
     if(s.loop!==false){const[eh,em]=(s.end_time||s.start_time||'00:00').split(':').map(Number);return{sM,eM:eh*60+em}}
-    const durMin=Math.max(Math.round(computeSourceDuration(s.source_type,s.source_id)/60),1);
+    const durMin=Math.max(Math.ceil(computeSourceDuration(s.source_type,s.source_id)/60),1);
     return{sM,eM:sM+durMin};
 }
 const schedPauseKey=s=>new Date().toDateString()+'|'+(s?.id||'-');
