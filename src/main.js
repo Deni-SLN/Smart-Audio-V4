@@ -53,6 +53,8 @@ try{ eventAdzanMuted=LS.get('eventAdzanMuted',false)===true; }catch{}
 let currentPlaylist=[], currentPlaylistIndex=-1, isPlaying=false, isPrayerTime=false, autoPlayEnabled=false, pausedPosition=0, stopAfterPlaylist=false, loopPlaylist=false, stopAfterCurrentSong=false, silencedUntil=0;
 let adzanPlayedToday={};
 try{ if(LS.get('adzanDay','')===new Date().toDateString()){const ap=LS.get('adzanPlayed',{})||{};if(typeof ap==='object'&&ap!==null)adzanPlayedToday=ap;} }catch{}
+let schedPlayedOnce={};
+try{ if(LS.get('schedOnceDay','')===new Date().toDateString()){const sp=LS.get('schedOncePlayed',{})||{};if(typeof sp==='object'&&sp!==null)schedPlayedOnce=sp;} }catch{}
 let prayerTimes={}, editingId=null, editingType='', editingPlaylistIds=[];
 let activeScheduleId=null, manualPauseKey=null, activeScheduleVolumePct=100;
 // true saat pengguna sedang memutar lagu dari Library (playTrack/playAllTracks).
@@ -680,8 +682,8 @@ function updateClock(){
     const dayStr=now.toDateString();
     if(dayStr!==_lastClockDay){
         _lastClockDay=dayStr;
-        adzanPlayedToday={};manualPauseKey=null;silencedUntil=0;
-        try{LS.set('adzanDay',dayStr);LS.set('adzanPlayed',adzanPlayedToday);}catch{}
+        adzanPlayedToday={};schedPlayedOnce={};manualPauseKey=null;silencedUntil=0;
+        try{LS.set('adzanDay',dayStr);LS.set('adzanPlayed',adzanPlayedToday);LS.set('schedOnceDay',dayStr);LS.set('schedOncePlayed',schedPlayedOnce);}catch{}
     }
     const hh=String(now.getHours()).padStart(2,'0'), mm=String(now.getMinutes()).padStart(2,'0'), ss=String(now.getSeconds()).padStart(2,'0');
     // Top panel jam sudah dihapus per permintaan user (17.42.47 Sel, 1 Sep) — biarkan jika elemen masih ada (backward compat)
@@ -1949,7 +1951,9 @@ function nextTrack(){
     }else if(!stopAfterPlaylist&&!stopAfterCurrentSong&&(settings.repeat||loopPlaylist)){
         currentPlaylistIndex=0;pausedPosition=0;loadAndPlay()
     }else{
-        isPlaying=false;stopAfterPlaylist=false;loopPlaylist=false;stopAfterCurrentSong=false;stopEventVideo();updatePlayPauseBtn();renderUpacaras();
+        isPlaying=false;pausedPosition=0;stopAfterPlaylist=false;loopPlaylist=false;stopAfterCurrentSong=false;
+        activeScheduleId=null;currentPlaylist=[];currentPlaylistIndex=-1;
+        stopEventVideo();updatePlayPauseBtn();renderUpacaras();
     }
 }
 window.nextTrack=nextTrack;
@@ -2666,6 +2670,7 @@ function scheduleWindow(s){
     return{sM,eM:sM+durMin};
 }
 const schedPauseKey=s=>new Date().toDateString()+'|'+(s?.id||'-');
+const schedOnceKey=s=>new Date().toDateString()+'|'+(s?.id||'-')+'|'+(s?.start_time||'');
 function checkAutoPlay(now){
     // Boot silent (auto-refresh tengah malam): jangan auto-putar musik beberapa detik agar refresh tidak membunyikan apa pun
     if(_bootSilent&&Date.now()-_bootTime<30000)return;
@@ -2679,6 +2684,8 @@ function checkAutoPlay(now){
         if(!s.enabled||!s.days.includes(td))continue;
         const win=scheduleWindow(s);
         if(nm<win.sM||nm>=win.eM)continue;
+        // Jangan ulangi jadwal 1x yang sudah diputar pada jam ini hari ini
+        if(s.loop===false&&schedPlayedOnce[schedOnceKey(s)])continue;
         // Jangan lanjut otomatis jika pengguna menjeda jadwal ini secara manual hari ini
         if(manualPauseKey&&manualPauseKey===schedPauseKey(s))continue;
         // Jika sedang tidak memutar (atau jadwal berganti ke jadwal baru setelah Ashar/jeda)
@@ -2693,6 +2700,10 @@ function checkAutoPlay(now){
                 currentPlaylist=s.loop?(settings.shuffle?[...sourceTracks].sort(()=>Math.random()-.5):sourceTracks):sourceTracks;
                 isLibraryPlaying=false;loopPlaylist=!!s.loop;stopAfterPlaylist=!s.loop;stopAfterCurrentSong=false;activeScheduleId=s.id;activeScheduleVolumePct=(typeof s.volume==='number'?s.volume:100);
                 manualPauseKey=null;
+                if(s.loop===false){
+                    schedPlayedOnce[schedOnceKey(s)]=true;
+                    try{LS.set('schedOnceDay',now.toDateString());LS.set('schedOncePlayed',schedPlayedOnce);}catch{}
+                }
                 if(isSameSched && pausedPosition>0){resumePlaying();toast('Lanjut: '+s.title)}
                 else{currentPlaylistIndex=0;loadAndPlay();toast('Auto: '+s.title)}
             }
