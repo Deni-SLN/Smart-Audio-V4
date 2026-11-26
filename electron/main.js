@@ -73,7 +73,52 @@ function serveStaticFile(req, res, filePath) {
     }
 }
 
-// Jalankan local HTTP server internal
+// Jalankan local HTTP server internal pada port tetap agar localStorage & IndexedDB
+// tidak pernah hilang saat PC restart atau aplikasi di-shutdown.
+const FIXED_PORT = 47831;
+
+function handleLocalDb(req, res) {
+    const dbPath = path.join(app.getPath('userData'), 'local-db.json');
+    if (req.method === 'GET') {
+        try {
+            if (!fs.existsSync(dbPath)) {
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+                res.end('{}');
+                return;
+            }
+            const raw = fs.readFileSync(dbPath, 'utf8');
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+            res.end(raw || '{}');
+        } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+    if (req.method === 'POST') {
+        const chunks = [];
+        req.on('data', (c) => chunks.push(c));
+        req.on('end', () => {
+            try {
+                const body = Buffer.concat(chunks).toString('utf8');
+                JSON.parse(body); // validasi JSON
+                fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+                const tmpPath = dbPath + '.tmp';
+                fs.writeFileSync(tmpPath, body, 'utf8');
+                fs.renameSync(tmpPath, dbPath);
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end('{"ok":true}');
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+    res.writeHead(405, { 'Content-Type': 'text/plain' });
+    res.end('Method Not Allowed');
+}
+
 async function startLocalServer() {
     process.env.GDRIVE_CACHE_DIR = path.join(app.getPath('userData'), 'gdrive-cache');
     const mod = await import('../server/gdrive-proxy.js');
@@ -81,6 +126,11 @@ async function startLocalServer() {
 
     return new Promise((resolve, reject) => {
         server = http.createServer((req, res) => {
+            // Tangani database lokal JSON di userData
+            if (req.url && req.url.startsWith('/api/local-db')) {
+                return handleLocalDb(req, res);
+            }
+
             // Tangani API Google Drive streaming & local disk cache
             if (req.url && req.url.startsWith('/api/gdrive')) {
                 return handleGdrive(req, res);
@@ -96,14 +146,27 @@ async function startLocalServer() {
             serveStaticFile(req, res, targetFile);
         });
 
-        // Dengarkan port bebas (0 = otomatis cari port yang tersedia)
-        server.listen(0, '127.0.0.1', () => {
+        let retriedFallback = false;
+        server.on('error', (err) => {
+            if (err.code === 'EADDRINUSE' && !retriedFallback) {
+                retriedFallback = true;
+                console.warn(`[Electron] Port ${FIXED_PORT} sedang dipakai, mencoba port cadangan...`);
+                server.listen(0, '127.0.0.1', () => {
+                    serverPort = server.address().port;
+                    console.log(`[Electron] Internal server running at http://127.0.0.1:${serverPort}`);
+                    resolve(serverPort);
+                });
+            } else {
+                reject(err);
+            }
+        });
+
+        // Gunakan port tetap 47831 agar origin & storage lokal selalu persisten
+        server.listen(FIXED_PORT, '127.0.0.1', () => {
             serverPort = server.address().port;
             console.log(`[Electron] Internal server running at http://127.0.0.1:${serverPort}`);
             resolve(serverPort);
         });
-
-        server.on('error', reject);
     });
 }
 

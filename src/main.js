@@ -324,6 +324,7 @@ function saveDesktopName(){
     if(!val){toast('Nama tidak boleh kosong');return;}
     currentUser.name=val;
     LS.set('currentUser',currentUser);
+    try{ saveDesktopDiskDb(); }catch{}
     updateUI();
     updateClock();
     closeModal('renameDesktopModal');
@@ -421,6 +422,30 @@ async function syncData(){
         await updateAdzanAvailability();
         ensureTrackDurations();
     }else{
+        if(isDesktopMode){
+            try{
+                const res=await fetch('/api/local-db',{cache:'no-store'});
+                if(res.ok){
+                    const diskDb=await res.json();
+                    const hasDiskData=diskDb&&(Array.isArray(diskDb.tracks)||Array.isArray(diskDb.schedules)||diskDb.settings);
+                    const lsEmpty=LS.get('tracks_'+currentUser.id,[]).length===0&&LS.get('schedules_'+currentUser.id,[]).length===0;
+                    const newerSeed=(diskDb?.seedVersion||0)>LS.get('localDbSeedVersion',0);
+                    if(hasDiskData&&(lsEmpty||newerSeed)){
+                        if(diskDb.currentUser?.name){currentUser.name=diskDb.currentUser.name;LS.set('currentUser',currentUser);}
+                        if(Array.isArray(diskDb.tracks))LS.set('tracks_'+currentUser.id,diskDb.tracks);
+                        if(Array.isArray(diskDb.playlists))LS.set('playlists_'+currentUser.id,diskDb.playlists);
+                        if(Array.isArray(diskDb.upacaras))LS.set('upacaras_'+currentUser.id,diskDb.upacaras);
+                        if(Array.isArray(diskDb.schedules))LS.set('schedules_'+currentUser.id,diskDb.schedules);
+                        if(diskDb.settings)LS.set('settings_'+currentUser.id,diskDb.settings);
+                        if(diskDb.locationName)LS.set('locationName',diskDb.locationName);
+                        if(diskDb.site_loc_name)LS.set('site_loc_name',diskDb.site_loc_name);
+                        if(diskDb.site_loc_saved)LS.set('site_loc_saved',diskDb.site_loc_saved);
+                        if(diskDb.seedVersion)LS.set('localDbSeedVersion',diskDb.seedVersion);
+                        try{updateUI();}catch{}
+                    }
+                }
+            }catch(e){console.warn('Gagal membaca local-db.json:',e);}
+        }
         tracks=LS.get('tracks_'+currentUser.id,[]);
         playlists=LS.get('playlists_'+currentUser.id,[]);
         upacaras=LS.get('upacaras_'+currentUser.id,[]);
@@ -434,11 +459,38 @@ async function syncData(){
         }
         await updateAdzanAvailability();
         ensureTrackDurations();
+        if(isDesktopMode&&(tracks.length>0||schedules.length>0)){
+            try{ saveDesktopDiskDb(); }catch{}
+        }
     }
     // Saklar Putar Otomatis disimpan di pengaturan (tersimpan ke database), default AKTIF
     autoPlayEnabled=settings.autoPlay!==false;
 }
 let _saveTimer=null;
+let _diskSaveTimer=null;
+function saveDesktopDiskDb(){
+    if(!isDesktopMode||!currentUser)return;
+    if(_diskSaveTimer)clearTimeout(_diskSaveTimer);
+    _diskSaveTimer=setTimeout(async()=>{
+        try{
+            const safeTracks=tracks.map(t=>t.type==='offline'&&t.src&&t.src.startsWith('blob:')?{...t,src:'',_localAvailable:undefined}:t);
+            const payload={
+                seedVersion:LS.get('localDbSeedVersion',1),
+                updatedAt:Date.now(),
+                currentUser:{id:currentUser.id,name:currentUser.name,username:currentUser.username,role:currentUser.role},
+                tracks:safeTracks,
+                playlists,
+                upacaras,
+                schedules,
+                settings,
+                locationName:LS.get('locationName',''),
+                site_loc_name:LS.get('site_loc_name',''),
+                site_loc_saved:LS.get('site_loc_saved',null)
+            };
+            await fetch('/api/local-db',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        }catch(e){console.warn('Gagal menyimpan local-db.json:',e);}
+    },300);
+}
 function saveLocal(){
     if(!currentUser)return;
     LS.set('settings_'+currentUser.id,settings);
@@ -454,6 +506,7 @@ function saveLocal(){
     LS.set('playlists_'+currentUser.id,playlists);
     LS.set('upacaras_'+currentUser.id,upacaras);
     LS.set('schedules_'+currentUser.id,schedules);
+    if(isDesktopMode)saveDesktopDiskDb();
 }
 // Tampilkan lokasi di berbagai tempat (topbar, dashboard jam digital, halaman Sholat)
 function refreshLocationDisplays(){
