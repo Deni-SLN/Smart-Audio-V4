@@ -3037,17 +3037,31 @@ try{
         location.reload();
     }, delay);
 })();
+// Auto-refresh harian setiap pukul 12:58 agar jadwal musik siang (13:00) selalu siap & segar
+function checkDailyNoonRefresh(){
+    const now=typeof getCorrectedNow==='function'?getCorrectedNow():new Date();
+    if(now.getHours()===12&&now.getMinutes()===58){
+        const todayStr=now.toDateString();
+        try{
+            if(localStorage.getItem('mp_noonReloadDay')!==todayStr){
+                localStorage.setItem('mp_noonReloadDay',todayStr);
+                localStorage.setItem('mp_silentReload',String(Date.now()));
+                location.reload();
+            }
+        }catch(e){}
+    }
+}
 // Gunakan Web Worker ticker agar timer tidak di-throttle browser saat tab di-minimize / background
 (function startReliableTicker(){
     let workerStarted = false;
     try {
         const blob = new Blob(['setInterval(() => postMessage(1), 1000);'], { type: 'application/javascript' });
         const w = new Worker(URL.createObjectURL(blob));
-        w.onmessage = () => updateClock();
+        w.onmessage = () => { updateClock(); checkDailyNoonRefresh(); };
         workerStarted = true;
     } catch (e) {}
     if (!workerStarted) {
-        setInterval(updateClock, 1000);
+        setInterval(() => { updateClock(); checkDailyNoonRefresh(); }, 1000);
     }
     updateClock();
 })();
